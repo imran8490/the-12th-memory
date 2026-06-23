@@ -4,20 +4,21 @@ const { Ed25519Keypair } = require("@mysten/sui/keypairs/ed25519");
 const { SuiGrpcClient } = require("@mysten/sui/client");
 const { walrus } = require("@mysten/walrus");
 
-const WALRUS_AGGREGATOR =
-  process.env.WALRUS_AGGREGATOR || "https://aggregator.walrus-testnet.walrus.space";
-
-const WALRUS_PUBLISHER =
-  process.env.WALRUS_PUBLISHER || "https://publisher.walrus-testnet.walrus.space";
-
 const SUIVISION_OBJECT_URL = "https://suivision.xyz/object";
 const SUIVISION_TX_URL = "https://suivision.xyz/txblock";
 
+const WALRUS_AGGREGATOR =
+  process.env.WALRUS_AGGREGATOR || "https://aggregator.walrus-mainnet.walrus.space";
+
+const WALRUS_PUBLISHER =
+  process.env.WALRUS_PUBLISHER || "https://publisher.walrus-mainnet.walrus.space";
+
 function safeJson(value) {
   return JSON.parse(
-    JSON.stringify(value, (_, v) =>
-      typeof v === "bigint" ? v.toString() : v
-    )
+    JSON.stringify(value, (_, v) => {
+      if (typeof v === "bigint") return v.toString();
+      return v;
+    })
   );
 }
 
@@ -37,22 +38,24 @@ function findValueByKey(obj, keys) {
 }
 
 function findWalrusBlobObjectId(result) {
-  const text = JSON.stringify(result, (_, value) =>
-    typeof value === "bigint" ? value.toString() : value
-  );
+  const text = JSON.stringify(result, (_, value) => {
+    if (typeof value === "bigint") return value.toString();
+    return value;
+  });
 
   const matches = text.match(/0x[a-fA-F0-9]{64}/g);
   if (!matches || matches.length === 0) return null;
 
   for (const id of matches) {
     const index = text.indexOf(id);
-    const nearby = text.slice(Math.max(0, index - 700), index + 700);
+    const nearby = text.slice(Math.max(0, index - 800), index + 800);
 
     if (
       nearby.includes("blob::Blob") ||
       nearby.includes("BlobRegistered") ||
       nearby.includes("walrus") ||
-      nearby.includes("Walrus")
+      nearby.includes("Walrus") ||
+      nearby.includes("blob")
     ) {
       return id;
     }
@@ -65,7 +68,7 @@ function createKeypair() {
   const privateKey = process.env.SUI_PRIVATE_KEY;
 
   if (!privateKey) {
-    throw new Error("SUI_PRIVATE_KEY missing in .env / Render env");
+    throw new Error("SUI_PRIVATE_KEY missing in .env or Render environment");
   }
 
   return Ed25519Keypair.fromSecretKey(privateKey);
@@ -114,8 +117,8 @@ async function storeMemoryOnWalrus(memory) {
       "blobId",
       "blob_id",
       "blobID",
-      "blob_id_base64",
       "encodedBlobId",
+      "blob_id_base64",
     ]) || null;
 
   const blobObjectId =
@@ -134,16 +137,18 @@ async function storeMemoryOnWalrus(memory) {
       "transaction_digest",
     ]) || null;
 
+  const explorerUrl = blobObjectId
+    ? `${SUIVISION_OBJECT_URL}/${blobObjectId}`
+    : txDigest
+      ? `${SUIVISION_TX_URL}/${txDigest}`
+      : null;
+
   return {
     success: true,
-    blobId: blobId || blobObjectId || null,
+    blobId: blobId || blobObjectId || txDigest || null,
     blobObjectId,
     txDigest,
-    explorerUrl: blobObjectId
-      ? `${SUIVISION_OBJECT_URL}/${blobObjectId}`
-      : txDigest
-        ? `${SUIVISION_TX_URL}/${txDigest}`
-        : null,
+    explorerUrl,
     rawResult: safeResult,
   };
 }
@@ -166,7 +171,6 @@ async function readMemoryFromWalrus(blobId) {
   const text = new TextDecoder().decode(result);
   return JSON.parse(text);
 }
-
 module.exports = {
   storeMemoryOnWalrus,
   readMemoryFromWalrus,
