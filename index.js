@@ -120,7 +120,7 @@ async function saveMemoryHandler(req, res) {
 
     return res.status(500).json({
       success: false,
-      message: "Walrus upload failed. Check Render logs.",
+      message: "Walrus upload failed: " + newMemory.error,
       error: newMemory.error,
       memory: newMemory,
       proof: newMemory.walrusProof,
