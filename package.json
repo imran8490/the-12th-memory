@@ -16,6 +16,8 @@
   "author": "Prince",
   "license": "MIT",
   "dependencies": {
+    "@mysten/sui": "^2.20.0",
+    "@mysten/walrus": "^1.2.2",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^5.1.0"

@@ -5,6 +5,7 @@ const fs = require("fs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const { storeMemoryOnWalrus, readMemoryFromWalrus } = require("./walrus-mainnet");
 
 app.use(cors());
 app.use(express.json());
@@ -247,10 +248,10 @@ function createAgentReply(message, memories) {
   return `I remember your latest World Cup take: you backed ${latest.team} with ${latest.confidence}% confidence. Prediction: "${latest.prediction}". Status: ${survival.emoji} ${survival.label}. Ask me to roast it, compare it, show your memory, or check your loyalty score.`;
 }
 
-app.post("/api/save-memory", (req, res) => {
+app.post("/api/save-memory", async (req, res) => {
   const { name, team, predictionType, prediction, confidence, mood } = req.body;
 
-  if (!name || !team || !prediction || !confidence) {
+  if (!name  !team  !prediction || !confidence) {
     return res.status(400).json({
       success: false,
       message: "Missing required fields"
@@ -272,9 +273,24 @@ app.post("/api/save-memory", (req, res) => {
     survivalEmoji: survival.emoji,
     survivalClass: survival.className,
     createdAt: new Date().toISOString(),
-    walrusStatus: "Demo mode - Walrus Mainnet integration next",
-    walrusProof: `demo_blob_${Date.now()}`
+    walrusStatus: "Pending Walrus Mainnet upload",
+    walrusProof: null,
+    walrusBlobObjectId: null
   };
+
+  try {
+    const walrusResult = await storeMemoryOnWalrus(newMemory);
+
+    newMemory.walrusStatus = "Stored on Walrus Mainnet";
+    newMemory.walrusProof = walrusResult.blobId;
+    newMemory.walrusBlobObjectId = walrusResult.blobObjectId;
+  } catch (error) {
+    console.error("Walrus Mainnet upload failed:", error.message);
+
+    newMemory.walrusStatus = "Walrus Mainnet upload failed - saved locally";
+    newMemory.walrusProof = local_fallback_${Date.now()};
+    newMemory.walrusError = error.message;
+  }
 
   memories.unshift(newMemory);
   writeMemory(memories);
@@ -285,6 +301,7 @@ app.post("/api/save-memory", (req, res) => {
     memory: newMemory
   });
 });
+
 
 app.get("/api/memories", (req, res) => {
   const memories = readMemory();
@@ -305,6 +322,26 @@ app.get("/api/memories", (req, res) => {
     memories: updatedMemories
   });
 });
+
+app.get("/api/walrus-memory/:blobId", async (req, res) => {
+  try {
+    const data = await readMemoryFromWalrus(req.params.blobId);
+
+    res.json({
+      success: true,
+      data
+    });
+  } catch (error) {
+    console.error("Walrus read failed:", error.message);
+
+    res.status(500).json({
+      success: false,
+      message: "Could not read memory from Walrus",
+      error: error.message
+    });
+  }
+});
+
 app.get("/api/clear-memory", (req, res) => {
   writeMemory([]);
 
