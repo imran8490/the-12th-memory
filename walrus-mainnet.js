@@ -1,7 +1,7 @@
 require("dotenv").config();
 
 const { Ed25519Keypair } = require("@mysten/sui/keypairs/ed25519");
-const { SuiGrpcClient } = require("@mysten/sui/client");
+const { SuiClient } = require("@mysten/sui/client");
 const { walrus } = require("@mysten/walrus");
 
 const SUIVISION_OBJECT_URL = "https://suivision.xyz/object";
@@ -75,7 +75,7 @@ function createKeypair() {
 }
 
 async function getWalrusClient() {
-  const suiClient = new SuiGrpcClient({
+  const suiClient = new SuiClient({
     url: "https://fullnode.mainnet.sui.io:443",
   });
 
