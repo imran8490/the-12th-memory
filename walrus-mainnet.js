@@ -1,47 +1,11 @@
 require("dotenv").config();
 
 const { Ed25519Keypair } = require("@mysten/sui/keypairs/ed25519");
+const { SuiGrpcClient } = require("@mysten/sui/grpc");
 const { walrus } = require("@mysten/walrus");
 
 const SUIVISION_OBJECT_URL = "https://suivision.xyz/object";
 const SUIVISION_TX_URL = "https://suivision.xyz/txblock";
-
-const WALRUS_AGGREGATOR =
-  process.env.WALRUS_AGGREGATOR || "https://aggregator.walrus-mainnet.walrus.space";
-
-const WALRUS_PUBLISHER =
-  process.env.WALRUS_PUBLISHER || "https://publisher.walrus-mainnet.walrus.space";
-
-function loadSuiClientConstructor() {
-  const paths = [
-    "@mysten/sui/client",
-    "@mysten/sui.js/client"
-  ];
-
-  for (const path of paths) {
-    try {
-      const mod = require(path);
-
-      const Client =
-        mod.SuiClient ||
-        mod.SuiGrpcClient ||
-        (mod.default && mod.default.SuiClient) ||
-        (mod.default && mod.default.SuiGrpcClient) ||
-        mod.default;
-
-      if (typeof Client === "function") {
-        console.log("Loaded Sui client from:", path);
-        return Client;
-      }
-
-      console.log("Sui client keys from " + path + ":", Object.keys(mod));
-    } catch (err) {
-      console.log("Failed loading " + path + ":", err.message);
-    }
-  }
-
-  throw new Error("No valid SuiClient constructor found. Check @mysten/sui package version.");
-}
 
 function safeJson(value) {
   return JSON.parse(
@@ -76,7 +40,7 @@ function findWalrusBlobObjectId(result) {
 
   for (const id of matches) {
     const index = text.indexOf(id);
-    const nearby = text.slice(Math.max(0, index - 800), index + 800);
+    const nearby = text.slice(Math.max(0, index - 1000), index + 1000);
 
     if (
       nearby.includes("blob::Blob") ||
@@ -103,22 +67,13 @@ function createKeypair() {
 }
 
 async function getWalrusClient() {
-  const SuiClient = loadSuiClientConstructor();
-
-  const suiClient = new SuiClient({
-    url: "https://fullnode.mainnet.sui.io:443"
+  const suiClient = new SuiGrpcClient({
+    network: "mainnet",
+    baseUrl: "https://fullnode.mainnet.sui.io:443"
   });
 
-  if (typeof suiClient.extend !== "function") {
-    throw new Error("suiClient.extend is not available. Installed Sui SDK version is not compatible with Walrus SDK.");
-  }
-
-  return suiClient.extend(
-    walrus({
-      network: "mainnet",
-      aggregatorUrl: WALRUS_AGGREGATOR,
-      publisherUrl: WALRUS_PUBLISHER
-    })
+  return suiClient.$extend(
+    walrus()
   );
 }
 
@@ -155,7 +110,7 @@ async function storeMemoryOnWalrus(memory) {
       "blob_id_base64"
     ]) || null;
 
-const blobObjectId =
+  const blobObjectId =
     findValueByKey(safeResult, [
       "blobObjectId",
       "blob_object_id",
@@ -188,7 +143,9 @@ const blobObjectId =
 }
 
 async function readMemoryFromWalrus(blobId) {
-  if (!blobId) throw new Error("Blob ID missing");
+  if (!blobId) {
+    throw new Error("Blob ID missing");
+  }
 
   if (blobId.startsWith("walrus_tx_")) {
     throw new Error("This is transaction fallback, not readable blob id");
