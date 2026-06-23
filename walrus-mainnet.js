@@ -55,7 +55,7 @@ async function storeMemoryOnWalrus(memory) {
 
   return {
     blobId: result.blobId,
-    blobObjectId: result.blobObject?.id?.id  result.blobObject?.id  null
+    blobObjectId: result.blobObject?.id?.id || result.blobObject?.id || null
   };
 }
 
