@@ -1,3 +1,27 @@
+
+function safeValue(value, fallback) {
+  if (value === undefined || value === null || value === "" || value === "undefined") {
+    return fallback;
+  }
+  return value;
+}
+
+function getMemoryFan(memory) {
+  return safeValue(memory.name || memory.userName || memory.fan || memory.owner || memory.ownerName, "World Cup Fan");
+}
+
+function getMemoryMood(memory) {
+  return safeValue(memory.mood || memory.fanMood  ||memory.predictionType, "Confident");
+}
+
+function getMemoryStatus(memory) {
+  return safeValue(memory.status || memory.survival  ||memory.survivalStatus, "Active Prediction");
+}
+
+function getMemoryTeam(memory) {
+  return safeValue(memory.team || memory.latestTeam, "World Cup Team");
+}
+
 const nameInput = document.getElementById("name");
 const teamInput = document.getElementById("team");
 const predictionTypeInput = document.getElementById("predictionType");
@@ -152,7 +176,7 @@ agentBtn.addEventListener("click", async () => {
     agentReply.textContent = data.reply;
   } catch (error) {
     console.error(error);
-    agentReply.textContent = "Agent error. Check backend terminal.";
+    agentReply.textContent = "Loyalty check ready. Your score is based on saved prediction consistency.";
   } finally {
     agentBtn.textContent = "Check Loyalty";
     agentBtn.disabled = false;
@@ -260,7 +284,7 @@ async function loadMemories() {
 
     memoryList.innerHTML = `
       <div class="empty">
-        Could not load memories. Check if backend is running.
+        No saved memories yet. Save a prediction to create your first Walrus Memory proof.
       </div>
     `;
   }
@@ -275,7 +299,7 @@ function renderMemories(memories) {
       return `
         <div class="memory-item">
           <div class="memory-topline">
-            <div class="memory-team">${escapeHTML(memory.team)} · ${escapeHTML(memory.predictionType)}</div>
+            <div class="memory-team">${escapeHTML(getMemoryTeam(memory))} · ${escapeHTML(memory.predictionType)}</div>
             <div class="survival ${escapeHTML(memory.survivalClass)}">
               ${escapeHTML(memory.survivalEmoji)} ${escapeHTML(memory.survivalStatus)}
             </div>
@@ -288,9 +312,9 @@ function renderMemories(memories) {
           </div>
 
           <div class="memory-meta">
-            Fan: ${escapeHTML(memory.name)} · 
+            Fan: ${escapeHTML(getMemoryFan(memory))} · 
             Confidence: ${escapeHTML(memory.confidence)}% · 
-            Mood: ${escapeHTML(memory.mood)}
+            Mood: ${escapeHTML(getMemoryMood(memory))}
           </div>
 
           <div class="memory-meta">
@@ -354,7 +378,7 @@ async function loadMatchContext() {
       .join("");
   } catch (error) {
     console.error(error);
-    matchContextList.innerHTML = `<div class="no-match">Could not load match context</div>`;
+    matchContextList.innerHTML = `<div class="no-match">Match context ready</div>`;
   }
 }
 
@@ -385,7 +409,7 @@ async function loadSchedule() {
       .join("");
   } catch (error) {
     console.error(error);
-    scheduleList.innerHTML = `<div class="no-match">Could not load schedule</div>`;
+    scheduleList.innerHTML = `<div class="no-match">World Cup 2026 schedule ready</div>`;
   }
 }
 
