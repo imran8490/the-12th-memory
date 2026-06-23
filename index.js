@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const express = require("express");
 const path = require("path");
-const { storeMemoryOnWalrus } = require("./walrus-mainnet");
+const { storeMemoryOnMemWal } = require("./memwal-mainnet");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -73,7 +73,7 @@ async function saveMemoryHandler(req, res) {
   const newMemory = buildMemoryFromRequest(req.body);
 
   try {
-    const walrusResult = await storeMemoryOnWalrus(newMemory);
+    const walrusResult = await storeMemoryOnMemWal(newMemory);
 
     const proof =
       walrusResult.blobObjectId ||
@@ -85,7 +85,7 @@ async function saveMemoryHandler(req, res) {
 
     newMemory.walrusProof = proof;
     newMemory.walrusExplorer = explorer;
-    newMemory.storage = "Walrus Mainnet";
+    newMemory.storage = "Walrus Memory / MemWal";
     newMemory.walrusStatus = "success";
 
     memories.unshift(newMemory);
