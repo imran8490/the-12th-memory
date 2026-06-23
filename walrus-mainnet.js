@@ -6,7 +6,7 @@ async function getWalrusMainnet() {
     return { client: cachedClient, keypair: cachedKeypair };
   }
 
-  const { SuiJsonRpcClient } = await import("@mysten/sui/jsonRpc");
+  const { SuiGrpcClient } = await import("@mysten/sui/grpc");
   const { Ed25519Keypair } = await import("@mysten/sui/keypairs/ed25519");
   const { decodeSuiPrivateKey } = await import("@mysten/sui/cryptography");
   const { walrus } = await import("@mysten/walrus");
@@ -18,12 +18,10 @@ async function getWalrusMainnet() {
   const decoded = decodeSuiPrivateKey(process.env.SUI_PRIVATE_KEY);
   const keypair = Ed25519Keypair.fromSecretKey(decoded.secretKey);
 
-  const suiClient = new SuiJsonRpcClient({
+  const client = new SuiGrpcClient({
     network: "mainnet",
-    url: process.env.SUI_RPC_URL || "https://fullnode.mainnet.sui.io:443"
-  });
-
-  const client = suiClient.$extend(walrus());
+    baseUrl: process.env.SUI_RPC_URL || "https://fullnode.mainnet.sui.io:443"
+  }).$extend(walrus());
 
   cachedClient = client;
   cachedKeypair = keypair;
@@ -44,7 +42,7 @@ async function storeMemoryOnWalrus(memory) {
 
   const blob = new TextEncoder().encode(JSON.stringify(memoryPayload, null, 2));
 
-  const result = await client.writeBlob({
+  const result = await client.walrus.writeBlob({
     blob,
     deletable: false,
     epochs: 1,
@@ -52,19 +50,15 @@ async function storeMemoryOnWalrus(memory) {
   });
 
   return {
-    blobId: result.blobId || result.blob_id || result.newlyCreated?.blobObject?.blob_id || null,
-    blobObjectId:
-      result.blobObject?.id?.id ||
-      result.blobObject?.id ||
-      result.newlyCreated?.blobObject?.id ||
-      null
+    blobId: result.blobId || null,
+    blobObjectId: result.blobObject?.id?.id || result.blobObject?.id || null
   };
 }
 
 async function readMemoryFromWalrus(blobId) {
   const { client } = await getWalrusMainnet();
 
-  const bytes = await client.readBlob({ blobId });
+  const bytes = await client.walrus.readBlob({ blobId });
   const text = new TextDecoder().decode(bytes);
 
   return JSON.parse(text);
