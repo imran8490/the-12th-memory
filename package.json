@@ -16,6 +16,7 @@
   "author": "Prince",
   "license": "MIT",
   "dependencies": {
+    "@mysten-incubation/memwal": "^0.0.7",
     "@mysten/sui": "^2.20.0",
     "@mysten/walrus": "^1.2.2",
     "cors": "^2.8.5",
