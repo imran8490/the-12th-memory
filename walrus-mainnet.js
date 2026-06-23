@@ -6,7 +6,7 @@ async function getWalrusMainnet() {
     return { client: cachedClient, keypair: cachedKeypair };
   }
 
-  const { getFullnodeUrl, SuiClient } = await import("@mysten/sui/client");
+  const { SuiClient } = await import("@mysten/sui/client");
   const { Ed25519Keypair } = await import("@mysten/sui/keypairs/ed25519");
   const { decodeSuiPrivateKey } = await import("@mysten/sui/cryptography");
   const { WalrusClient } = await import("@mysten/walrus");
@@ -19,8 +19,8 @@ async function getWalrusMainnet() {
   const keypair = Ed25519Keypair.fromSecretKey(decoded.secretKey);
 
   const suiClient = new SuiClient({
-    url: getFullnodeUrl("mainnet")
-  });
+    url: process.env.SUI_RPC_URL || "https://fullnode.mainnet.sui.io:443"});
+  
 
   const client = new WalrusClient({
     network: "mainnet",
