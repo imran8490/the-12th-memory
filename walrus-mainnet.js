@@ -6,10 +6,10 @@ async function getWalrusMainnet() {
     return { client: cachedClient, keypair: cachedKeypair };
   }
 
-  const { SuiClient } = await import("@mysten/sui/client");
+  const { SuiJsonRpcClient } = await import("@mysten/sui/jsonRpc");
   const { Ed25519Keypair } = await import("@mysten/sui/keypairs/ed25519");
   const { decodeSuiPrivateKey } = await import("@mysten/sui/cryptography");
-  const { WalrusClient } = await import("@mysten/walrus");
+  const { walrus } = await import("@mysten/walrus");
 
   if (!process.env.SUI_PRIVATE_KEY) {
     throw new Error("Missing SUI_PRIVATE_KEY environment variable");
@@ -18,14 +18,12 @@ async function getWalrusMainnet() {
   const decoded = decodeSuiPrivateKey(process.env.SUI_PRIVATE_KEY);
   const keypair = Ed25519Keypair.fromSecretKey(decoded.secretKey);
 
-  const suiClient = new SuiClient({
-    url: process.env.SUI_RPC_URL || "https://fullnode.mainnet.sui.io:443"});
-  
-
-  const client = new WalrusClient({
+  const suiClient = new SuiJsonRpcClient({
     network: "mainnet",
-    suiClient
+    url: process.env.SUI_RPC_URL || "https://fullnode.mainnet.sui.io:443"
   });
+
+  const client = suiClient.$extend(walrus());
 
   cachedClient = client;
   cachedKeypair = keypair;
@@ -54,8 +52,12 @@ async function storeMemoryOnWalrus(memory) {
   });
 
   return {
-    blobId: result.blobId,
-    blobObjectId: result.blobObject?.id?.id || result.blobObject?.id || null
+    blobId: result.blobId || result.blob_id || result.newlyCreated?.blobObject?.blob_id || null,
+    blobObjectId:
+      result.blobObject?.id?.id ||
+      result.blobObject?.id ||
+      result.newlyCreated?.blobObject?.id ||
+      null
   };
 }
 
@@ -72,4 +74,3 @@ module.exports = {
   storeMemoryOnWalrus,
   readMemoryFromWalrus
 };
-
