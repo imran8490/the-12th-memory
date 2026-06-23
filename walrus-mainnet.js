@@ -1,5 +1,17 @@
-let cachedClient = null;
-let cachedKeypair = null;
+require("dotenv").config();
+
+const { Ed25519Keypair } = require("@mysten/sui/keypairs/ed25519");
+const { SuiGrpcClient } = require("@mysten/sui/client");
+const { walrus } = require("@mysten/walrus");
+
+const WALRUS_AGGREGATOR =
+  process.env.WALRUS_AGGREGATOR || "https://aggregator.walrus-testnet.walrus.space";
+
+const WALRUS_PUBLISHER =
+  process.env.WALRUS_PUBLISHER || "https://publisher.walrus-testnet.walrus.space";
+
+const SUIVISION_OBJECT_URL = "https://suivision.xyz/object";
+const SUIVISION_TX_URL = "https://suivision.xyz/txblock";
 
 function safeJson(value) {
   return JSON.parse(
@@ -12,114 +24,150 @@ function safeJson(value) {
 function findValueByKey(obj, keys) {
   if (!obj || typeof obj !== "object") return null;
 
-  for (const key of keys) {
-    if (obj[key]) return obj[key];
-  }
+  for (const key of Object.keys(obj)) {
+    if (keys.includes(key)) {
+      return obj[key];
+    }
 
-  for (const value of Object.values(obj)) {
-    const found = findValueByKey(value, keys);
+    const found = findValueByKey(obj[key], keys);
     if (found) return found;
   }
 
   return null;
 }
 
-async function getWalrusMainnet() {
-  if (cachedClient && cachedKeypair) {
-    return { client: cachedClient, keypair: cachedKeypair };
+function findWalrusBlobObjectId(result) {
+  const text = JSON.stringify(result, (_, value) =>
+    typeof value === "bigint" ? value.toString() : value
+  );
+
+  const matches = text.match(/0x[a-fA-F0-9]{64}/g);
+  if (!matches || matches.length === 0) return null;
+
+  for (const id of matches) {
+    const index = text.indexOf(id);
+    const nearby = text.slice(Math.max(0, index - 700), index + 700);
+
+    if (
+      nearby.includes("blob::Blob") ||
+      nearby.includes("BlobRegistered") ||
+      nearby.includes("walrus") ||
+      nearby.includes("Walrus")
+    ) {
+      return id;
+    }
   }
 
-  const { SuiGrpcClient } = await import("@mysten/sui/grpc");
-  const { Ed25519Keypair } = await import("@mysten/sui/keypairs/ed25519");
-  const { decodeSuiPrivateKey } = await import("@mysten/sui/cryptography");
-  const { walrus } = await import("@mysten/walrus");
+  return matches[0];
+}
 
-  if (!process.env.SUI_PRIVATE_KEY) {
-    throw new Error("Missing SUI_PRIVATE_KEY environment variable");
+function createKeypair() {
+  const privateKey = process.env.SUI_PRIVATE_KEY;
+
+  if (!privateKey) {
+    throw new Error("SUI_PRIVATE_KEY missing in .env / Render env");
   }
 
-  const decoded = decodeSuiPrivateKey(process.env.SUI_PRIVATE_KEY);
-  const keypair = Ed25519Keypair.fromSecretKey(decoded.secretKey);
+  return Ed25519Keypair.fromSecretKey(privateKey);
+}
 
-  const client = new SuiGrpcClient({
-    network: "mainnet",
-    baseUrl: process.env.SUI_RPC_URL || "https://fullnode.mainnet.sui.io:443"
-  }).$extend(walrus());
+async function getWalrusClient() {
+  const suiClient = new SuiGrpcClient({
+    url: "https://fullnode.mainnet.sui.io:443",
+  });
 
-  cachedClient = client;
-  cachedKeypair = keypair;
-
-  return { client, keypair };
+  return suiClient.extend(
+    walrus({
+      network: "mainnet",
+      aggregatorUrl: WALRUS_AGGREGATOR,
+      publisherUrl: WALRUS_PUBLISHER,
+    })
+  );
 }
 
 async function storeMemoryOnWalrus(memory) {
-  const { client, keypair } = await getWalrusMainnet();
+  const keypair = createKeypair();
+  const client = await getWalrusClient();
 
   const memoryPayload = {
-    app: "The 12th Memory",
-    network: "walrus-mainnet",
-    type: "world-cup-fan-memory",
-    version: "1.0.0",
-    memory
+    project: "The 12th Memory",
+    type: "world_cup_fan_memory",
+    createdAt: new Date().toISOString(),
+    memory,
   };
 
-  const blob = new TextEncoder().encode(
-    JSON.stringify(memoryPayload, null, 2)
-  );
+  const blob = new TextEncoder().encode(JSON.stringify(memoryPayload));
 
   const result = await client.walrus.writeBlob({
     blob,
     deletable: false,
     epochs: 1,
-    signer: keypair
+    signer: keypair,
   });
 
   const safeResult = safeJson(result);
-  console.log("WALRUS WRITE RESULT:", safeResult);
+
+  console.log("WALRUS WRITE RESULT:", JSON.stringify(safeResult, null, 2));
 
   const blobId =
-    findValueByKey(safeResult, ["blobId", "blob_id", "blobID"]) || null;
+    findValueByKey(safeResult, [
+      "blobId",
+      "blob_id",
+      "blobID",
+      "blob_id_base64",
+      "encodedBlobId",
+    ]) || null;
 
   const blobObjectId =
-    findValueByKey(safeResult, ["blobObjectId", "blob_object_id"]) ||
-    findValueByKey(safeResult, ["objectId", "object_id"]) ||
-    findValueByKey(safeResult, ["id"]) ||
-    null;
+    findValueByKey(safeResult, [
+      "blobObjectId",
+      "blob_object_id",
+      "objectId",
+      "object_id",
+    ]) || findWalrusBlobObjectId(safeResult);
 
   const txDigest =
     findValueByKey(safeResult, [
       "digest",
       "txDigest",
       "transactionDigest",
-      "transaction_digest"
+      "transaction_digest",
     ]) || null;
 
   return {
-    blobId: blobId || `walrus_tx_${txDigest || Date.now()}`,
+    success: true,
+    blobId: blobId  blobObjectId  null,
     blobObjectId,
     txDigest,
-    rawResult: safeResult
+    explorerUrl: blobObjectId
+      ? ${SUIVISION_OBJECT_URL}/${blobObjectId}
+      : txDigest
+        ? ${SUIVISION_TX_URL}/${txDigest}
+        : null,
+    rawResult: safeResult,
   };
 }
 
 async function readMemoryFromWalrus(blobId) {
-  const { client } = await getWalrusMainnet();
-
   if (!blobId) {
-    throw new Error("Missing blobId");
+    throw new Error("Blob ID missing");
   }
 
   if (blobId.startsWith("walrus_tx_")) {
-    throw new Error("This proof is a transaction digest, not a readable blob id");
+    throw new Error("This is transaction fallback, not readable blob id");
   }
 
-  const bytes = await client.walrus.readBlob({ blobId });
-  const text = new TextDecoder().decode(bytes);
+  const client = await getWalrusClient();
 
+  const result = await client.walrus.readBlob({
+    blobId,
+  });
+
+  const text = new TextDecoder().decode(result);
   return JSON.parse(text);
 }
 
 module.exports = {
   storeMemoryOnWalrus,
-  readMemoryFromWalrus
+  readMemoryFromWalrus,
 };
