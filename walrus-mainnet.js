@@ -136,13 +136,13 @@ async function storeMemoryOnWalrus(memory) {
 
   return {
     success: true,
-    blobId: blobId  blobObjectId  null,
+    blobId: blobId || blobObjectId || null,
     blobObjectId,
     txDigest,
     explorerUrl: blobObjectId
-      ? ${SUIVISION_OBJECT_URL}/${blobObjectId}
+      ? `${SUIVISION_OBJECT_URL}/${blobObjectId}`
       : txDigest
-        ? ${SUIVISION_TX_URL}/${txDigest}
+        ? `${SUIVISION_TX_URL}/${txDigest}`
         : null,
     rawResult: safeResult,
   };
