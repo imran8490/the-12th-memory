@@ -251,7 +251,7 @@ function createAgentReply(message, memories) {
 app.post("/api/save-memory", async (req, res) => {
   const { name, team, predictionType, prediction, confidence, mood } = req.body;
 
-  if (!name  !team  !prediction || !confidence) {
+  if (!name || !team || !prediction || !confidence) {
     return res.status(400).json({
       success: false,
       message: "Missing required fields"
@@ -288,7 +288,7 @@ app.post("/api/save-memory", async (req, res) => {
     console.error("Walrus Mainnet upload failed:", error.message);
 
     newMemory.walrusStatus = "Walrus Mainnet upload failed - saved locally";
-    newMemory.walrusProof = local_fallback_${Date.now()};
+    newMemory.walrusProof = `local_fallback_${Date.now()}`;
     newMemory.walrusError = error.message;
   }
 
