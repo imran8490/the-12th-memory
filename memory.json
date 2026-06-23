@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1782191977846,
+    "name": "Prince",
+    "team": "England",
+    "predictionType": "Dark Horse",
+    "prediction": "England might surprise everyone but I am not fully confident",
+    "confidence": "35",
+    "mood": "Loyal",
+    "survivalStatus": "Waiting for Kickoff",
+    "survivalEmoji": "⏳",
+    "survivalClass": "waiting",
+    "createdAt": "2026-06-23T05:19:37.846Z",
+    "walrusStatus": "Demo mode - Walrus Mainnet integration next",
+    "walrusProof": "demo_blob_1782191977846"
+  },
+  {
+    "id": 1782191895665,
+    "name": "Prince",
+    "team": "Brazil",
+    "predictionType": "Finalist",
+    "prediction": "Brazil can reach the final if their attack says strong",
+    "confidence": "60",
+    "mood": "Loyal",
+    "survivalStatus": "In Danger",
+    "survivalEmoji": "⚠️",
+    "survivalClass": "danger",
+    "createdAt": "2026-06-23T05:18:15.665Z",
+    "walrusStatus": "Demo mode - Walrus Mainnet integration next",
+    "walrusProof": "demo_blob_1782191895665"
+  },
+  {
+    "id": 1782191815437,
+    "name": "Prince",
+    "team": "Argentina",
+    "predictionType": "Winner",
+    "prediction": "Argrntina will win world cup 2026",
+    "confidence": "80",
+    "mood": "Loyal",
+    "survivalStatus": "Alive",
+    "survivalEmoji": "✅",
+    "survivalClass": "alive",
+    "createdAt": "2026-06-23T05:16:55.437Z",
+    "walrusStatus": "Demo mode - Walrus Mainnet integration next",
+    "walrusProof": "demo_blob_1782191815437"
+  }
+]

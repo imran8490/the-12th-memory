@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The 12th Memory</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="top-header">
+      <div class="brand-block">
+        <div class="logo-ball">12</div>
+        <div>
+          <h1>The 12th Memory</h1>
+          <p>Every fan is the 12th man. Now their football memory has proof.</p>
+        </div>
+      </div>
+
+      <div class="countdown-card">
+        <span>Memory Status</span>
+        <strong>ACTIVE</strong>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-target="chatSection">💬 AI Chat Agent</button>
+      <button class="tab" data-target="saveSection">🏆 Save Prediction</button>
+      <button class="tab" data-target="matchSection">📋 Match Context</button>
+      <button class="tab" data-target="consoleSection">🧠 Walrus Console</button>
+      <button class="tab" data-target="timelineSection">🕒 Memory Timeline</button>
+    </nav>
+
+    <section class="dashboard-grid">
+      <aside class="sidebar" id="saveSection">
+        <h2>💡 Suggested Prompts</h2>
+
+        <button class="prompt-btn">Which team am I backing?</button>
+        <button class="prompt-btn">Roast my last prediction</button>
+        <button class="prompt-btn">Show my football memory</button>
+        <button class="prompt-btn">Compare Argentina vs Brazil</button>
+        <button class="prompt-btn">What is my loyalty score?</button>
+        <button class="prompt-btn">Show match context</button>
+        <button class="prompt-btn">Show upcoming schedule</button>
+        <button class="prompt-btn">Is my prediction still alive?</button>
+
+        <div class="prediction-card">
+          <h3>Save Prediction</h3>
+
+          <label>Your Name</label>
+          <input id="name" type="text" placeholder="Prince" />
+
+          <label>Team</label>
+          <select id="team">
+            <option>Argentina</option>
+            <option>Brazil</option>
+            <option>France</option>
+            <option>England</option>
+            <option>Portugal</option>
+            <option>Germany</option>
+            <option>Spain</option>
+            <option>Netherlands</option>
+            <option>Italy</option>
+            <option>Uruguay</option>
+            <option>Belgium</option>
+            <option>Croatia</option>
+            <option>Japan</option>
+            <option>Mexico</option>
+            <option>USA</option>
+            <option>Canada</option>
+          </select>
+
+          <label>Prediction Type</label>
+          <select id="predictionType">
+            <option>Winner</option>
+            <option>Finalist</option>
+            <option>Top Scorer</option>
+            <option>Dark Horse</option>
+            <option>Biggest Upset</option>
+          </select>
+
+          <label>Prediction</label>
+          <textarea id="prediction" placeholder="Argentina will win World Cup 2026"></textarea>
+
+          <label>Confidence: <span id="confidenceValue">80</span>%</label>
+          <input id="confidence" type="range" min="1" max="100" value="80" />
+
+          <label>Fan Mood</label>
+          <select id="mood">
+            <option>Loyal</option>
+            <option>Overconfident</option>
+            <option>Doubtful</option>
+            <option>Emotional</option>
+            <option>Roast Ready</option>
+          </select>
+
+          <button id="saveBtn" class="yellow-action">Save Memory</button>
+        </div>
+      </aside>
+
+      <section class="chat-panel" id="chatSection">
+        <div class="chat-top">
+          <div>
+            <span class="green-dot"></span>
+            <strong>AI Fan Memory Agent</strong>
+          </div>
+          <span class="live-pill">Walrus Demo</span>
+        </div>
+
+        <div id="chatMessages" class="chat-messages">
+          <div class="message-row bot">
+            <div class="avatar">12</div>
+            <div class="bubble bot-bubble">
+              Welcome to The 12th Memory. Save a World Cup prediction, then ask me to remember, compare, roast, check match context, or show survival status.
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input-area">
+          <input id="chatInput" type="text" placeholder="Ask about your World Cup memory..." />
+          <button id="sendBtn">Send ➜</button>
+        </div>
+      </section>
+
+      <aside class="memory-console" id="consoleSection">
+        <h2>Walrus Memory Console</h2>
+
+        <div class="console-card">
+          <span>Storage Mode</span>
+          <strong>Demo JSON</strong>
+          <small>Walrus Mainnet integration next</small>
+        </div>
+
+        <div class="console-card">
+          <span>Saved Memories</span>
+          <strong id="memoryScore">0</strong>
+          <small>Total prediction records</small>
+        </div>
+
+        <div class="console-card">
+          <span>Loyalty Score</span>
+          <strong id="loyaltyScore">--</strong>
+          <small>Based on team consistency</small>
+        </div>
+
+        <div class="console-card">
+          <span>Latest Team</span>
+          <strong id="latestTeam">--</strong>
+          <small>Last saved football memory</small>
+        </div>
+
+        <div class="console-card survival-console">
+          <span>Prediction Survival</span>
+          <strong id="survivalMeter">--</strong>
+          <small id="survivalInfo">Save a prediction to calculate status</small>
+        </div>
+
+        <div class="console-card">
+          <span>Memory Proof</span>
+          <strong id="memoryProof">--</strong>
+          <small>Demo blob ID shown here</small>
+        </div>
+
+        <div class="match-board" id="matchSection">
+          <h3>Match Context Board</h3>
+          <div id="matchContextList" class="match-list">
+            Loading match context...
+          </div>
+        </div>
+
+        <div class="match-board">
+          <h3>Upcoming Schedule</h3>
+          <div id="scheduleList" class="match-list">
+            Loading schedule...
+          </div>
+        </div>
+
+        <div class="mini-agent">
+          <h3>Quick Loyalty Check</h3>
+
+          <select id="askTeam">
+            <option>Argentina</option>
+            <option>Brazil</option>
+            <option>France</option>
+            <option>England</option>
+            <option>Portugal</option>
+            <option>Germany</option>
+            <option>Spain</option>
+            <option>Netherlands</option>
+            <option>Italy</option>
+            <option>Uruguay</option>
+            <option>Belgium</option>
+            <option>Croatia</option>
+            <option>Japan</option>
+            <option>Mexico</option>
+            <option>USA</option>
+            <option>Canada</option>
+          </select>
+
+          <button id="agentBtn" class="yellow-action">Check Loyalty</button>
+
+          <p id="agentReply">Agent waiting for memory...</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="memory-vault" id="timelineSection">
+      <div class="vault-head">
+        <div>
+          <h2>Memory Timeline</h2>
+          <p>Prediction history, mood, confidence, survival meter and Walrus proof.</p>
+        </div>
+
+        <button id="refreshBtn">Refresh</button>
+      </div>
+
+      <div id="memoryList" class="memory-list"></div>
+    </section>
+  </main>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

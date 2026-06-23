@@ -1,0 +1,23 @@
+{
+  "name": "the-12th-memory",
+  "version": "1.0.0",
+  "description": "A Walrus-powered World Cup 2026 fan memory agent",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "keywords": [
+    "walrus",
+    "world-cup",
+    "memory-agent",
+    "ai-agent"
+  ],
+  "author": "Prince",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^5.1.0"
+  }
+}
