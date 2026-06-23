@@ -42,35 +42,50 @@ async function storeMemoryOnWalrus(memory) {
 
   const blob = new TextEncoder().encode(JSON.stringify(memoryPayload, null, 2));
 
-  
+  const result = await client.walrus.writeBlob({
+    blob,
+    deletable: false,
+    epochs: 1,
+    signer: keypair
+  });
 
+  console.log("WALRUS WRITE RESULT:", JSON.stringify(result, null, 2));
 
-const result = await client.walrus.writeBlob({
-  blob,
-  deletable: false,
-  epochs: 1,
-  signer: keypair
-});
-
-console.log("WALRUS WRITE RESULT:", JSON.stringify(result, null, 2));
-
-return {
-  blobId:
+  const blobId =
     result.blobId ||
     result.blob_id ||
     result.newlyCreated?.blobObject?.blobId ||
     result.newlyCreated?.blobObject?.blob_id ||
+    result.newlyCreated?.blobObject?.blob_id?.id ||
     result.alreadyCertified?.blobId ||
     result.alreadyCertified?.blob_id ||
-    null,
+    null;
 
-  blobObjectId:
+  const blobObjectId =
     result.blobObject?.id?.id ||
     result.blobObject?.id ||
     result.newlyCreated?.blobObject?.id?.id ||
     result.newlyCreated?.blobObject?.id ||
-    null
-};
+    result.alreadyCertified?.blobObject?.id?.id ||
+    result.alreadyCertified?.blobObject?.id ||
+    null;
+
+  return {
+    blobId,
+    blobObjectId,
+    rawResult: result
+  };
+}
+
+async function readMemoryFromWalrus(blobId) {
+  const { client } = await getWalrusMainnet();
+
+  const bytes = await client.walrus.readBlob({ blobId });
+  const text = new TextDecoder().decode(bytes);
+
+  return JSON.parse(text);
+}
+
 module.exports = {
   storeMemoryOnWalrus,
   readMemoryFromWalrus
