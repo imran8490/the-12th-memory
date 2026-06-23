@@ -42,28 +42,35 @@ async function storeMemoryOnWalrus(memory) {
 
   const blob = new TextEncoder().encode(JSON.stringify(memoryPayload, null, 2));
 
-  const result = await client.walrus.writeBlob({
-    blob,
-    deletable: false,
-    epochs: 1,
-    signer: keypair
-  });
+  
 
-  return {
-    blobId: result.blobId || null,
-    blobObjectId: result.blobObject?.id?.id || result.blobObject?.id || null
-  };
-}
 
-async function readMemoryFromWalrus(blobId) {
-  const { client } = await getWalrusMainnet();
+const result = await client.walrus.writeBlob({
+  blob,
+  deletable: false,
+  epochs: 1,
+  signer: keypair
+});
 
-  const bytes = await client.walrus.readBlob({ blobId });
-  const text = new TextDecoder().decode(bytes);
+console.log("WALRUS WRITE RESULT:", JSON.stringify(result, null, 2));
 
-  return JSON.parse(text);
-}
+return {
+  blobId:
+    result.blobId ||
+    result.blob_id ||
+    result.newlyCreated?.blobObject?.blobId ||
+    result.newlyCreated?.blobObject?.blob_id ||
+    result.alreadyCertified?.blobId ||
+    result.alreadyCertified?.blob_id ||
+    null,
 
+  blobObjectId:
+    result.blobObject?.id?.id ||
+    result.blobObject?.id ||
+    result.newlyCreated?.blobObject?.id?.id ||
+    result.newlyCreated?.blobObject?.id ||
+    null
+};
 module.exports = {
   storeMemoryOnWalrus,
   readMemoryFromWalrus
