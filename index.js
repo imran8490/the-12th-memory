@@ -305,6 +305,14 @@ app.get("/api/memories", (req, res) => {
     memories: updatedMemories
   });
 });
+app.get("/api/clear-memory", (req, res) => {
+  writeMemory([]);
+
+  res.json({
+    success: true,
+    message: "All memories cleared successfully"
+  });
+});
 
 app.get("/api/match-context", (req, res) => {
   const matches = demoMatches.filter((match) => match.status === "MATCH_CONTEXT");
