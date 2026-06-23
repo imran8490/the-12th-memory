@@ -173,7 +173,6 @@ function createAgentReply(message, memories) {
   if (
     text.includes("match context") ||
     text.includes("demo match") ||
-    text.includes("score") ||
     text.includes("match board")
   ) {
     const contextMatches = demoMatches.filter((match) => match.status === "MATCH_CONTEXT");
