@@ -49,32 +49,43 @@ async function storeMemoryOnWalrus(memory) {
     signer: keypair
   });
 
-  console.log("WALRUS WRITE RESULT:", JSON.stringify(result, null, 2));
+ const safeResult = JSON.parse(
+  JSON.stringify(result, (_, value) =>
+    typeof value === "bigint" ? value.toString() : value
+  )
+);
 
-  const blobId =
-    result.blobId ||
-    result.blob_id ||
-    result.newlyCreated?.blobObject?.blobId ||
-    result.newlyCreated?.blobObject?.blob_id ||
-    result.newlyCreated?.blobObject?.blob_id?.id ||
-    result.alreadyCertified?.blobId ||
-    result.alreadyCertified?.blob_id ||
-    null;
+console.log("WALRUS WRITE RESULT:", safeResult);
+const blobId =
+  safeResult.blobId ||
+  safeResult.blob_id ||
+  safeResult.newlyCreated?.blobObject?.blobId ||
+  safeResult.newlyCreated?.blobObject?.blob_id ||
+  safeResult.newlyCreated?.blobObject?.blob_id?.id ||
+  safeResult.alreadyCertified?.blobId ||
+  safeResult.alreadyCertified?.blob_id ||
+  safeResult.blobObject?.blobId ||
+  safeResult.blobObject?.blob_id ||
+  null;
 
-  const blobObjectId =
-    result.blobObject?.id?.id ||
-    result.blobObject?.id ||
-    result.newlyCreated?.blobObject?.id?.id ||
-    result.newlyCreated?.blobObject?.id ||
-    result.alreadyCertified?.blobObject?.id?.id ||
-    result.alreadyCertified?.blobObject?.id ||
-    null;
+const blobObjectId =
+  safeResult.blobObject?.id?.id ||
+  safeResult.blobObject?.id ||
+  safeResult.newlyCreated?.blobObject?.id?.id ||
+  safeResult.newlyCreated?.blobObject?.id ||
+  safeResult.alreadyCertified?.blobObject?.id?.id ||
+  safeResult.alreadyCertified?.blobObject?.id ||
+  null;
 
-  return {
-    blobId,
-    blobObjectId,
-    rawResult: result
-  };
+if (!blobId) {
+  throw new Error("Walrus write succeeded but blobId was not found in SDK result");
+}
+
+return {
+  blobId,
+  blobObjectId
+};
+
 }
 
 async function readMemoryFromWalrus(blobId) {
