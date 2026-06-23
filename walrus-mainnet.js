@@ -1,7 +1,6 @@
 require("dotenv").config();
 
 const { Ed25519Keypair } = require("@mysten/sui/keypairs/ed25519");
-const { SuiClient } = require("@mysten/sui/client");
 const { walrus } = require("@mysten/walrus");
 
 const SUIVISION_OBJECT_URL = "https://suivision.xyz/object";
@@ -13,9 +12,40 @@ const WALRUS_AGGREGATOR =
 const WALRUS_PUBLISHER =
   process.env.WALRUS_PUBLISHER || "https://publisher.walrus-mainnet.walrus.space";
 
+function loadSuiClientConstructor() {
+  const paths = [
+    "@mysten/sui/client",
+    "@mysten/sui.js/client"
+  ];
+
+  for (const path of paths) {
+    try {
+      const mod = require(path);
+
+      const Client =
+        mod.SuiClient ||
+        mod.SuiGrpcClient ||
+        (mod.default && mod.default.SuiClient) ||
+        (mod.default && mod.default.SuiGrpcClient) ||
+        mod.default;
+
+      if (typeof Client === "function") {
+        console.log("Loaded Sui client from:", path);
+        return Client;
+      }
+
+      console.log("Sui client keys from " + path + ":", Object.keys(mod));
+    } catch (err) {
+      console.log("Failed loading " + path + ":", err.message);
+    }
+  }
+
+  throw new Error("No valid SuiClient constructor found. Check @mysten/sui package version.");
+}
+
 function safeJson(value) {
   return JSON.parse(
-    JSON.stringify(value, (_, v) => {
+    JSON.stringify(value, function (_, v) {
       if (typeof v === "bigint") return v.toString();
       return v;
     })
@@ -26,9 +56,7 @@ function findValueByKey(obj, keys) {
   if (!obj || typeof obj !== "object") return null;
 
   for (const key of Object.keys(obj)) {
-    if (keys.includes(key)) {
-      return obj[key];
-    }
+    if (keys.includes(key)) return obj[key];
 
     const found = findValueByKey(obj[key], keys);
     if (found) return found;
@@ -38,7 +66,7 @@ function findValueByKey(obj, keys) {
 }
 
 function findWalrusBlobObjectId(result) {
-  const text = JSON.stringify(result, (_, value) => {
+  const text = JSON.stringify(result, function (_, value) {
     if (typeof value === "bigint") return value.toString();
     return value;
   });
@@ -68,22 +96,28 @@ function createKeypair() {
   const privateKey = process.env.SUI_PRIVATE_KEY;
 
   if (!privateKey) {
-    throw new Error("SUI_PRIVATE_KEY missing in .env or Render environment");
+    throw new Error("SUI_PRIVATE_KEY missing in Render environment");
   }
 
   return Ed25519Keypair.fromSecretKey(privateKey);
 }
 
 async function getWalrusClient() {
+  const SuiClient = loadSuiClientConstructor();
+
   const suiClient = new SuiClient({
-    url: "https://fullnode.mainnet.sui.io:443",
+    url: "https://fullnode.mainnet.sui.io:443"
   });
+
+  if (typeof suiClient.extend !== "function") {
+    throw new Error("suiClient.extend is not available. Installed Sui SDK version is not compatible with Walrus SDK.");
+  }
 
   return suiClient.extend(
     walrus({
       network: "mainnet",
       aggregatorUrl: WALRUS_AGGREGATOR,
-      publisherUrl: WALRUS_PUBLISHER,
+      publisherUrl: WALRUS_PUBLISHER
     })
   );
 }
@@ -96,16 +130,16 @@ async function storeMemoryOnWalrus(memory) {
     project: "The 12th Memory",
     type: "world_cup_fan_memory",
     createdAt: new Date().toISOString(),
-    memory,
+    memory: memory
   };
 
   const blob = new TextEncoder().encode(JSON.stringify(memoryPayload));
 
   const result = await client.walrus.writeBlob({
-    blob,
+    blob: blob,
     deletable: false,
     epochs: 1,
-    signer: keypair,
+    signer: keypair
   });
 
   const safeResult = safeJson(result);
@@ -118,15 +152,15 @@ async function storeMemoryOnWalrus(memory) {
       "blob_id",
       "blobID",
       "encodedBlobId",
-      "blob_id_base64",
+      "blob_id_base64"
     ]) || null;
 
-  const blobObjectId =
+const blobObjectId =
     findValueByKey(safeResult, [
       "blobObjectId",
       "blob_object_id",
       "objectId",
-      "object_id",
+      "object_id"
     ]) || findWalrusBlobObjectId(safeResult);
 
   const txDigest =
@@ -134,29 +168,27 @@ async function storeMemoryOnWalrus(memory) {
       "digest",
       "txDigest",
       "transactionDigest",
-      "transaction_digest",
+      "transaction_digest"
     ]) || null;
 
   const explorerUrl = blobObjectId
-    ? `${SUIVISION_OBJECT_URL}/${blobObjectId}`
+    ? SUIVISION_OBJECT_URL + "/" + blobObjectId
     : txDigest
-      ? `${SUIVISION_TX_URL}/${txDigest}`
+      ? SUIVISION_TX_URL + "/" + txDigest
       : null;
 
   return {
     success: true,
     blobId: blobId || blobObjectId || txDigest || null,
-    blobObjectId,
-    txDigest,
-    explorerUrl,
-    rawResult: safeResult,
+    blobObjectId: blobObjectId,
+    txDigest: txDigest,
+    explorerUrl: explorerUrl,
+    rawResult: safeResult
   };
 }
 
 async function readMemoryFromWalrus(blobId) {
-  if (!blobId) {
-    throw new Error("Blob ID missing");
-  }
+  if (!blobId) throw new Error("Blob ID missing");
 
   if (blobId.startsWith("walrus_tx_")) {
     throw new Error("This is transaction fallback, not readable blob id");
@@ -165,13 +197,14 @@ async function readMemoryFromWalrus(blobId) {
   const client = await getWalrusClient();
 
   const result = await client.walrus.readBlob({
-    blobId,
+    blobId: blobId
   });
 
   const text = new TextDecoder().decode(result);
   return JSON.parse(text);
 }
+
 module.exports = {
   storeMemoryOnWalrus,
-  readMemoryFromWalrus,
+  readMemoryFromWalrus
 };
