@@ -90,13 +90,36 @@ async function storeMemoryOnWalrus(memory) {
 
   const blob = new TextEncoder().encode(JSON.stringify(memoryPayload));
 
-  const result = await client.walrus.writeBlob({
-    blob: blob,
-    deletable: false,
-    epochs: 1,
-    signer: keypair
-  });
+  let result;
+let lastError;
 
+for (let attempt = 1; attempt <= 3; attempt++) {
+  try {
+    console.log("Walrus write attempt:", attempt);
+
+    result = await client.walrus.writeBlob({
+      blob: blob,
+      deletable: false,
+      epochs: 2,
+      signer: keypair
+    });
+
+    break;
+  } catch (err) {
+    lastError = err;
+    console.error("Walrus write attempt failed:", attempt, err.message || err);
+
+    if (attempt < 3) {
+      await new Promise(function (resolve) {
+        setTimeout(resolve, 5000);
+      });
+    }
+  }
+}
+
+if (!result) {
+  throw lastError;
+}
   const safeResult = safeJson(result);
 
   console.log("WALRUS WRITE RESULT:", JSON.stringify(safeResult, null, 2));
