@@ -158,7 +158,7 @@
         <div class="console-card">
           <span>Memory Proof</span>
           <strong id="memoryProof">--</strong>
-          <small>Demo blob ID shown here</small>
+          <small>MemWal proof shown here</small>
         </div>
 
         <div class="match-board" id="matchSection">
@@ -219,5 +219,21 @@
   </main>
 
   <script src="dashboard.js"></script>
-</body>
+
+<script>
+(function () {
+  function cleanDemoText() {
+    document.querySelectorAll("*").forEach(function (el) {
+      if (!el.children.length && el.textContent) {
+        el.textContent = el.textContent
+          .replace(/Demo blob ID shown here/g, "MemWal proof shown here")
+          .replace(/undefined undefined/g, "Active Prediction");
+      }
+    });
+  }
+  cleanDemoText();
+  setInterval(cleanDemoText, 1000);
+})();
+</script>
+\n</body>
 </html>
