@@ -158,7 +158,7 @@
         <div class="console-card">
           <span>Memory Proof</span>
           <strong id="memoryProof">--</strong>
-          <small>MemWal proof shown here</small>
+          <small>Demo blob ID shown here</small>
         </div>
 
         <div class="match-board" id="matchSection">
@@ -199,7 +199,7 @@
 
           <button id="agentBtn" class="yellow-action">Check Loyalty</button>
 
-          <p id="agentReply">Agent waiting for memory.</p>
+          <p id="agentReply">Agent waiting for memory...</p>
         </div>
       </aside>
     </section>
@@ -219,22 +219,5 @@
   </main>
 
   <script src="dashboard.js"></script>
-
-<script>
-(function () {
-  function cleanDemoText() {
-    document.querySelectorAll("*").forEach(function (el) {
-      if (!el.children.length && el.textContent) {
-        el.textContent = el.textContent
-          .replace(/Demo blob ID shown here/g, "MemWal proof shown here")
-          .replace(/undefined undefined/g, "Active Prediction");
-      }
-    });
-  }
-  cleanDemoText();
-  setInterval(cleanDemoText, 1000);
-})();
-</script>
-\n
 </body>
 </html>
