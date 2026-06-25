@@ -9,22 +9,58 @@ const moodInput = document.getElementById("mood");
 const saveBtn = document.getElementById("saveBtn");
 const refreshBtn = document.getElementById("refreshBtn");
 const memoryList = document.getElementById("memoryList");
+const memoryTimeline = document.getElementById("memoryTimeline");
 
 const askTeam = document.getElementById("askTeam");
 const agentBtn = document.getElementById("agentBtn");
-const agentReply = document.getElementById("agentReply");
+const agentReply = document.getElementById("loyaltyResult");
 
 const loyaltyScore = document.getElementById("loyaltyScore");
 const memoryScore = document.getElementById("memoryScore");
 const latestTeam = document.getElementById("latestTeam");
+const memoryProof = document.getElementById("memoryProof");
+const survivalMeter = document.getElementById("survivalMeter");
+const survivalInfo = document.getElementById("survivalInfo");
 
 const chatMessages = document.getElementById("chatMessages");
 const chatInput = document.getElementById("chatInput");
 const sendBtn = document.getElementById("sendBtn");
 const promptButtons = document.querySelectorAll(".prompt-btn");
 
+function escapeHTML(text) {
+  return String(text || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function cleanTeam(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function getProof(memory) {
-  return memory.proof || memory.blobId || memory.blob_id || memory.walrusProof || memory.walrusId || "";
+  return (
+    memory.proofUrl ||
+    memory.proof ||
+    memory.blobId ||
+    memory.blob_id ||
+    memory.walrusProof ||
+    memory.walrusId ||
+    ""
+  );
+}
+
+async function fetchMemories() {
+  const res = await fetch("/api/memories", { cache: "no-store" });
+  const data = await res.json();
+
+  if (!data.success || !Array.isArray(data.memories)) {
+    return [];
+  }
+
+  return data.memories;
 }
 
 if (confidenceInput && confidenceValue) {
@@ -35,85 +71,147 @@ if (confidenceInput && confidenceValue) {
 
 promptButtons.forEach((button) => {
   button.addEventListener("click", async () => {
+    if (!chatInput) return;
     chatInput.value = button.textContent.trim();
     await sendChatMessage();
   });
 });
 
-saveBtn.addEventListener("click", async () => {
-  const payload = {
-    name: nameInput.value.trim(),
-    team: teamInput.value,
-    predictionType: predictionTypeInput.value,
-    prediction: predictionInput.value.trim(),
-    confidence: confidenceInput.value,
-    mood: moodInput.value
-  };
+if (saveBtn) {
+  saveBtn.addEventListener("click", async () => {
+    const payload = {
+      name: nameInput ? nameInput.value.trim() : "",
+      team: teamInput ? teamInput.value : "",
+      predictionType: predictionTypeInput ? predictionTypeInput.value : "",
+      prediction: predictionInput ? predictionInput.value.trim() : "",
+      confidence: confidenceInput ? confidenceInput.value : "80",
+      mood: moodInput ? moodInput.value : "Loyal"
+    };
 
-  if (!payload.name) return alert("Name required nanba");
-  if (!payload.prediction) return alert("Prediction required nanba");
+    if (!payload.name) return alert("Name required nanba");
+    if (!payload.prediction) return alert("Prediction required nanba");
 
-  try {
-    saveBtn.textContent = "Saving...";
-    saveBtn.disabled = true;
+    try {
+      saveBtn.textContent = "Saving...";
+      saveBtn.disabled = true;
 
-    const res = await fetch("/api/save-memory", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+      const res = await fetch("/api/save-memory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-    const data = await res.json();
-    if (!data.success) return alert(data.message || "Something went wrong");
+      const data = await res.json();
 
-    predictionInput.value = "";
+      if (!data.success) {
+        return alert(data.error || data.message || "Something went wrong");
+      }
 
-    const proof = data.memory ? getProof(data.memory) : "";
-    addBotMessage(
-      `Memory saved. I will remember that ${payload.name} backed ${payload.team} with ${payload.confidence}% confidence.${proof ? " Proof: " + proof : ""}`
-    );
+      if (predictionInput) predictionInput.value = "";
 
+      const savedMemory = data.memory || {};
+      const proof = getProof(savedMemory);
+
+      addBotMessage(
+        `Memory saved. I will remember that ${payload.name} backed ${payload.team} with ${payload.confidence}% confidence.${proof ? " Proof: " + proof : ""}`
+      );
+
+      await loadMemories();
+      await loadMemoryTimelineBox();
+    } catch (error) {
+      console.error(error);
+      alert("Server error. Check terminal.");
+    } finally {
+      saveBtn.textContent = "Save Memory";
+      saveBtn.disabled = false;
+    }
+  });
+}
+
+if (sendBtn) {
+  sendBtn.addEventListener("click", sendChatMessage);
+}
+
+if (chatInput) {
+  chatInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") sendChatMessage();
+  });
+}
+
+if (agentBtn) {
+  agentBtn.addEventListener(
+    "click",
+    async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      await checkQuickLoyalty();
+    },
+    true
+  );
+}
+
+if (refreshBtn) {
+  refreshBtn.addEventListener("click", async () => {
     await loadMemories();
-  } catch (error) {
-    console.error(error);
-    alert("Server error. Check terminal.");
-  } finally {
-    saveBtn.textContent = "Save Memory";
-    saveBtn.disabled = false;
-  }
-});
+    await loadMemoryTimelineBox();
+  });
+}
 
-sendBtn.addEventListener("click", sendChatMessage);
-
-chatInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") sendChatMessage();
-});
-
-agentBtn.addEventListener("click", async () => {
+async function checkQuickLoyalty() {
   try {
+    if (!agentBtn || !askTeam || !agentReply) return;
+
     agentBtn.textContent = "Checking...";
     agentBtn.disabled = true;
 
-    const res = await fetch("/api/agent-reply", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ team: askTeam.value })
+    const selectedTeam = askTeam.value;
+    const memories = await fetchMemories();
+
+    if (!memories.length) {
+      agentReply.innerHTML = `
+        <b>Final Loyalty Score: 0%</b><br>
+        Selected team: ${escapeHTML(selectedTeam)}<br>
+        Reason: No saved memories found yet.
+      `;
+
+      if (loyaltyScore) loyaltyScore.textContent = "0%";
+      return;
+    }
+
+    const totalMemories = memories.length;
+    const latestMemory = memories[0];
+
+    const matchedMemories = memories.filter((memory) => {
+      return cleanTeam(memory.team) === cleanTeam(selectedTeam);
     });
 
-    const data = await res.json();
-    agentReply.textContent = data.reply;
+    const score = Math.round((matchedMemories.length / totalMemories) * 100);
+
+    agentReply.innerHTML = `
+      <b>Final Loyalty Score: ${score}%</b><br>
+      Selected team: ${escapeHTML(selectedTeam)}<br>
+      Latest memory team: ${escapeHTML(latestMemory.team)}<br>
+      Saved memories for this team: ${matchedMemories.length}/${totalMemories}<br>
+      Reason: Score is based on real saved memory count.
+    `;
+
+    if (loyaltyScore) loyaltyScore.textContent = `${score}%`;
+    if (latestTeam) latestTeam.textContent = latestMemory.team || "--";
   } catch (error) {
     console.error(error);
-    agentReply.textContent = "Agent error. Check backend terminal.";
+    if (agentReply) agentReply.textContent = "Loyalty check failed. Check backend terminal.";
   } finally {
-    agentBtn.textContent = "Check Loyalty";
-    agentBtn.disabled = false;
+    if (agentBtn) {
+      agentBtn.textContent = "Check Loyalty";
+      agentBtn.disabled = false;
+    }
   }
-});
-
-refreshBtn.addEventListener("click", loadMemories);
+}
 
 async function sendChatMessage() {
+  if (!chatInput || !sendBtn) return;
+
   const message = chatInput.value.trim();
   if (!message) return;
 
@@ -127,7 +225,13 @@ async function sendChatMessage() {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message })
+      body: JSON.stringify({
+        message,
+        currentTeam: teamInput ? teamInput.value : "",
+        currentPrediction: predictionInput ? predictionInput.value.trim() : "",
+        currentMood: moodInput ? moodInput.value : "",
+        currentConfidence: confidenceInput ? confidenceInput.value : ""
+      })
     });
 
     const data = await res.json();
@@ -142,71 +246,101 @@ async function sendChatMessage() {
 }
 
 function addUserMessage(text) {
+  if (!chatMessages) return;
+
   const row = document.createElement("div");
   row.className = "message-row user";
   row.innerHTML = `
     <div class="bubble user-bubble">${escapeHTML(text)}</div>
     <div class="avatar">U</div>
   `;
+
   chatMessages.appendChild(row);
   scrollChatBottom();
 }
 
 function addBotMessage(text) {
+  if (!chatMessages) return;
+
   const row = document.createElement("div");
   row.className = "message-row bot";
   row.innerHTML = `
     <div class="avatar">12</div>
-    <div class="bubble bot-bubble">${escapeHTML(text)}</div>
+    <div class="bubble bot-bubble">${escapeHTML(text).replaceAll("\n", "<br>")}</div>
   `;
+
   chatMessages.appendChild(row);
   scrollChatBottom();
 }
 
 function scrollChatBottom() {
+  if (!chatMessages) return;
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 async function loadMemories() {
   try {
-    const res = await fetch("/api/memories", { cache: "no-store" });
-    const data = await res.json();
+    const memories = await fetchMemories();
 
-    if (!data.memories || data.memories.length === 0) {
-      memoryList.innerHTML = `<div class="empty">No fan memory yet. Save your first World Cup prediction.</div>`;
-      loyaltyScore.textContent = "--";
-      memoryScore.textContent = "0";
-      latestTeam.textContent = "--";
+    if (!memories.length) {
+      if (memoryList) {
+        memoryList.innerHTML = `<div class="empty">No fan memory yet. Save your first World Cup prediction.</div>`;
+      }
+
+      if (loyaltyScore) loyaltyScore.textContent = "--";
+      if (memoryScore) memoryScore.textContent = "0";
+      if (latestTeam) latestTeam.textContent = "--";
+      if (memoryProof) memoryProof.textContent = "--";
+      if (survivalMeter) survivalMeter.textContent = "--";
+      if (survivalInfo) survivalInfo.textContent = "Save a prediction to calculate status";
       return;
     }
 
-    renderMemories(data.memories);
-    calculateStats(data.memories);
+    renderMemories(memories);
+    calculateStats(memories);
   } catch (error) {
     console.error(error);
-    memoryList.innerHTML = `<div class="empty">Could not load memories. Check if backend is running.</div>`;
+
+    if (memoryList) {
+      memoryList.innerHTML = `<div class="empty">Could not load memories. Check if backend is running.</div>`;
+    }
   }
 }
 
 function renderMemories(memories) {
+  if (!memoryList) return;
+
   memoryList.innerHTML = memories
     .map((memory, index) => {
-      const date = new Date(memory.createdAt).toLocaleString();
+      const date = memory.createdAt
+        ? new Date(memory.createdAt).toLocaleString()
+        : "Unknown date";
+
       const tag = index === 0 ? "Latest Memory" : `Memory #${memories.length - index}`;
       const proof = getProof(memory);
 
       return `
         <div class="memory-item">
-          <div class="memory-team">${escapeHTML(memory.team)} · ${escapeHTML(memory.predictionType || "Active Prediction")}</div>
-          <div class="memory-date">${tag} · ${date}</div>
-          <div class="memory-prediction">${escapeHTML(memory.prediction)}</div>
+          <div class="memory-team">
+            ${escapeHTML(memory.team || "--")} · ${escapeHTML(memory.predictionType || "Active Prediction")}
+          </div>
+
+          <div class="memory-date">${escapeHTML(tag)} · ${escapeHTML(date)}</div>
+
+          <div class="memory-prediction">${escapeHTML(memory.prediction || "--")}</div>
+
           <div class="memory-meta">
-            Fan: ${escapeHTML(memory.name || "World Cup Fan")} · 
-            Confidence: ${escapeHTML(memory.confidence || "80")}% · 
+            Fan: ${escapeHTML(memory.name || "World Cup Fan")} ·
+            Confidence: ${escapeHTML(memory.confidence || "80")}% ·
             Mood: ${escapeHTML(memory.mood || "Confident")}
           </div>
+
           <div class="memory-meta">
-            ${proof ? "MemWal Proof: " + escapeHTML(proof) : escapeHTML(memory.walrusStatus || "Walrus Mainnet")}
+            ${
+              proof
+                ? `MemWal Proof: <a href="${escapeHTML(proof)}" target="_blank">${escapeHTML(proof)}</a>`
+                : escapeHTML(memory.storage || memory.walrusStatus || "Walrus Mainnet")
+            }
           </div>
         </div>
       `;
@@ -216,162 +350,75 @@ function renderMemories(memories) {
 
 function calculateStats(memories) {
   const latest = memories[0];
-  const sameTeamCount = memories.filter((memory) => memory.team === latest.team).length;
-  const score = Math.round((sameTeamCount / memories.length) * 100);
+  const proof = getProof(latest);
 
-  loyaltyScore.textContent = `${score}%`;
-  memoryScore.textContent = `${memories.length}`;
-  latestTeam.textContent = latest.team;
+  const totalMemories = memories.length;
+  const latestTeamCount = memories.filter((memory) => {
+    return cleanTeam(memory.team) === cleanTeam(latest.team);
+  }).length;
+
+  const realScore = Math.round((latestTeamCount / totalMemories) * 100);
+
+  if (loyaltyScore) loyaltyScore.textContent = `${realScore}%`;
+  if (memoryScore) memoryScore.textContent = `${totalMemories}`;
+  if (latestTeam) latestTeam.textContent = latest.team || "--";
+
+  if (memoryProof) {
+    memoryProof.textContent = proof ? proof.slice(0, 18) + "..." : "--";
+  }
+
+  if (survivalMeter) {
+    survivalMeter.textContent = latest.confidence ? `${latest.confidence}%` : "80%";
+  }
+
+  if (survivalInfo) {
+    survivalInfo.textContent = `${latest.team || "Your team"} prediction is still active`;
+  }
 }
 
-function escapeHTML(text) {
-  return String(text)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
+async function loadMemoryTimelineBox() {
+  if (!memoryTimeline) return;
 
-document.addEventListener("DOMContentLoaded", loadMemories);
+  try {
+    const memories = await fetchMemories();
 
-// FINAL STABLE DASHBOARD FIX
-(function () {
-  const TEAMS = ["Argentina", "Brazil", "England", "France", "Portugal"];
-
-  function pageText() {
-    return document.body ? document.body.innerText : "";
-  }
-
-  function parseMemories() {
-    const text = pageText();
-    const list = [];
-    const seen = {};
-    const re = /Memory saved\.\s*I will remember that\s+\S+\s+backed\s+(Argentina|Brazil|England|France|Portugal)\s+with\s+(\d+)%\s+confidence\.\s+Proof:\s*([A-Za-z0-9_-]+)/gi;
-    let m;
-
-    while ((m = re.exec(text)) !== null) {
-      const proof = m[3];
-      if (!seen[proof]) {
-        seen[proof] = true;
-        list.push({
-          team: m[1],
-          confidence: Number(m[2]),
-          proof
-        });
-      }
-    }
-
-    return list;
-  }
-
-  function latestMemory() {
-    const memories = parseMemories();
-    if (memories.length) return memories[memories.length - 1];
-
-    return {
-      team: "Brazil",
-      confidence: 80,
-      proof: ""
-    };
-  }
-
-  function scoreForTeam(team) {
-    const memories = parseMemories();
-    if (!memories.length) return 0;
-
-    const same = memories.filter(m => m.team === team).length;
-    return Math.round((same / memories.length) * 100);
-  }
-
-  function walkText(node, fn) {
-    if (!node) return;
-
-    if (node.nodeType === Node.TEXT_NODE) {
-      node.nodeValue = fn(node.nodeValue);
+    if (!memories.length) {
+      memoryTimeline.innerHTML = "<p>No memories saved yet.</p>";
       return;
     }
 
-    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    memoryTimeline.innerHTML = memories
+      .map((memory) => {
+        const proof = getProof(memory);
 
-    const tag = node.tagName ? node.tagName.toLowerCase() : "";
-    if (["script", "style", "input", "textarea", "select"].includes(tag)) return;
-
-    node.childNodes.forEach(child => walkText(child, fn));
+        return `
+          <div class="memory-card">
+            <h3>✅ Memory Saved on Walrus</h3>
+            <p><b>Team:</b> ${escapeHTML(memory.team || "--")}</p>
+            <p><b>Prediction:</b> ${escapeHTML(memory.prediction || "--")}</p>
+            <p><b>Confidence:</b> ${escapeHTML(memory.confidence || "--")}%</p>
+            <p><b>Storage:</b> ${escapeHTML(memory.storage || "Walrus Mainnet")}</p>
+            <p><b>Blob ID:</b> ${escapeHTML(memory.blobId || "--")}</p>
+            ${
+              proof
+                ? `<a href="${escapeHTML(proof)}" target="_blank">View Walrus Proof</a>`
+                : ""
+            }
+          </div>
+        `;
+      })
+      .join("");
+  } catch (error) {
+    console.error(error);
+    memoryTimeline.innerHTML = "<p>Failed to load memories.</p>";
   }
+}
 
-  function cleanDashboardText() {
-    const latest = latestMemory();
+window.loadMemories = loadMemories;
+window.loadMemoryTimeline = loadMemoryTimelineBox;
+window.checkQuickLoyalty = checkQuickLoyalty;
 
-    walkText(document.body, function (txt) {
-      return txt
-        .replace(/Loading match context\.\.\./g, "Match context ready")
-        .replace(/Could not load match context/g, "Match context ready")
-        .replace(/Loading schedule\.\.\./g, "World Cup 2026 schedule ready")
-        .replace(/Could not load schedule/g, "World Cup 2026 schedule ready")
-        .replace(/Agent error\. Check backend terminal\./g, "Loyalty check ready")
-        .replace(/Demo blob ID shown here/g, "MemWal proof shown here")
-        .replace(/undefined undefined/g, "Active Prediction")
-        .replace(/--/g, function () {
-          return latest.proof ? "Active Prediction" : "--";
-        });
-    });
-  }
-
-  function findQuickCard(btn) {
-    let card = btn.parentElement;
-    while (card && card.innerText && !card.innerText.includes("Quick Loyalty Check")) {
-      card = card.parentElement;
-    }
-    return card || btn.parentElement;
-  }
-
-  function fixQuickLoyalty() {
-    document.querySelectorAll("button").forEach(function (btn) {
-      if (!btn.textContent || !btn.textContent.includes("Check Loyalty")) return;
-      if (btn.dataset.stableFixed === "yes") return;
-
-      btn.dataset.stableFixed = "yes";
-
-      btn.addEventListener("click", function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-
-        const card = findQuickCard(btn);
-        const select = card.querySelector("select");
-        const selected = select && TEAMS.includes(select.value) ? select.value : latestMemory().team;
-        const latest = latestMemory();
-        const score = scoreForTeam(selected);
-
-        let result = card.querySelector(".stable-loyalty-result");
-        if (!result) {
-          result = document.createElement("div");
-          result.className = "stable-loyalty-result";
-          result.style.marginTop = "12px";
-          result.style.padding = "12px";
-          result.style.borderRadius = "12px";
-          result.style.background = "rgba(255,255,255,0.08)";
-          result.style.color = "#fff";
-          result.style.fontWeight = "600";
-          result.style.lineHeight = "1.4";
-          card.appendChild(result);
-        }
-result.textContent = "Your loyalty score is " + score + "%. Selected team: " + selected + ". Latest memory team: " + latest.team + ".";
-      }, true);
-    });
-  }
-
-  function runStableFix() {
-    cleanDashboardText();
-    fixQuickLoyalty();
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", runStableFix);
-  } else {
-    runStableFix();
-  }
-
-  setInterval(runStableFix, 1000);
-})();
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadMemories();
+  await loadMemoryTimelineBox();
+});

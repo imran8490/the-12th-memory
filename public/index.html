@@ -121,8 +121,7 @@
           <button id="sendBtn">Send ➜</button>
         </div>
       </section>
-
-      <aside class="memory-console" id="consoleSection">
+<aside class="memory-console" id="consoleSection">
         <h2>Walrus Memory Console</h2>
 
         <div class="console-card">
@@ -199,7 +198,7 @@
 
           <button id="agentBtn" class="yellow-action">Check Loyalty</button>
 
-          <p id="agentReply">Agent waiting for memory.</p>
+          <div id="loyaltyResult" class="agent-result">Agent waiting for memory.</div>
         </div>
       </aside>
     </section>
@@ -219,22 +218,5 @@
   </main>
 
   <script src="dashboard.js"></script>
-
-<script>
-(function () {
-  function cleanDemoText() {
-    document.querySelectorAll("*").forEach(function (el) {
-      if (!el.children.length && el.textContent) {
-        el.textContent = el.textContent
-          .replace(/Demo blob ID shown here/g, "MemWal proof shown here")
-          .replace(/undefined undefined/g, "Active Prediction");
-      }
-    });
-  }
-  cleanDemoText();
-  setInterval(cleanDemoText, 1000);
-})();
-</script>
-\n
 </body>
 </html>

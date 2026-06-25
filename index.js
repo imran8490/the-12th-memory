@@ -1,618 +1,760 @@
 require("dotenv").config();
 
 const express = require("express");
+const cors = require("cors");
+const fs = require("fs");
 const path = require("path");
-const { storeMemoryOnMemWal } = require("./memwal-mainnet");
 
 const app = express();
-const PORT = process.env.PORT || 10000;
 
+app.use(cors());
 app.use(express.json({ limit: "2mb" }));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, "public")));
 
-const memories = [];
+const PORT = process.env.PORT || 10000;
+const PUBLIC_DIR = path.join(__dirname, "public");
 
-// FINAL WORKING API OVERRIDES
-function getMemoryListFinal() {
+const MEMORY_INDEX_FILE = path.join(__dirname, "memory-index.json");
+const ROAST_INDEX_FILE = path.join(__dirname, "roast-index.json");
+
+const MEMWAL_NAMESPACE = process.env.MEMWAL_NAMESPACE || "the-12th-memory";
+const MEMWAL_SERVER_URL =
+  process.env.MEMWAL_SERVER_URL || "https://relayer.memory.walrus.xyz";
+
+const WALRUS_AGGREGATOR_URL =
+  process.env.WALRUS_AGGREGATOR_URL ||
+  "https://aggregator.walrus-mainnet.walrus.space/v1/blobs";
+
+let memwalClient = null;
+
+/* ---------------- ENV CHECK ---------------- */
+
+function checkEnv() {
+  const key = process.env.MEMWAL_PRIVATE_KEY || process.env.MEMWAL_KEY;
+  const accountId = process.env.MEMWAL_ACCOUNT_ID;
+
+  if (!key) throw new Error("Missing MEMWAL_PRIVATE_KEY in .env");
+  if (!accountId) throw new Error("Missing MEMWAL_ACCOUNT_ID in .env");
+
+  return { key, accountId };
+}
+
+/* ---------------- MEMWAL CLIENT ---------------- */
+
+async function getMemWal() {
+  if (memwalClient) return memwalClient;
+
+  const { key, accountId } = checkEnv();
+  const { MemWal } = await import("@mysten-incubation/memwal");
+
+  memwalClient = MemWal.create({
+    key,
+    accountId,
+    serverUrl: MEMWAL_SERVER_URL,
+    namespace: MEMWAL_NAMESPACE,
+  });
+
+  return memwalClient;
+}
+
+/* ---------------- FILE HELPERS ---------------- */
+
+function loadJsonFile(filePath) {
   try {
-    if (typeof memories !== "undefined" && Array.isArray(memories)) return memories;
-  } catch (e) {}
-  return [];
+    if (!fs.existsSync(filePath)) return [];
+
+    const raw = fs.readFileSync(filePath, "utf8");
+    if (!raw.trim()) return [];
+
+    return JSON.parse(raw);
+  } catch (error) {
+    console.error("JSON load error:", error.message);
+    return [];
+  }
 }
 
-function normalizeMemoryFinal(m) {
-  m = m || {};
-  return {
-    name: m.name ||  m.userName || m.fan || "World Cup Fan",
-    team: m.team ||  m.latestTeam || "Brazil",
-    confidence: Number(m.confidence || 80),
-    mood: m.mood || m.fanMood || "Confident",
-    prediction: m.prediction || m.text || "World Cup fan prediction",
-    proof: m.proof  || m.blobId || m.blob_id || m.memoryProof || ""
-  };
+function saveJsonFile(filePath, data) {
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.error("JSON save error:", error.message);
+  }
 }
 
-function latestMemoryFinal() {
-  const list = getMemoryListFinal().map(normalizeMemoryFinal);
-  return list.length ? list[0] : {
-    name: "World Cup Fan",
-    team: "Brazil",
-    confidence: 80,
-    mood: "Confident",
-    prediction: "World Cup fan prediction",
-    proof: ""
-  };
+/* ---------------- MEMORY INDEX ---------------- */
+
+function loadMemoryIndex() {
+  return loadJsonFile(MEMORY_INDEX_FILE);
 }
 
-function scoreForTeamFinal(team) {
-  const list = getMemoryListFinal().map(normalizeMemoryFinal);
-  if (!list.length) return 0;
-
-  const selected = String(team || latestMemoryFinal().team).toLowerCase();
-  const same = list.filter(function (m) {
-    return String(m.team).toLowerCase() === selected;
-  }).length;
-
-  return Math.round((same / list.length) * 100);
+function saveMemoryIndex(memories) {
+  saveJsonFile(MEMORY_INDEX_FILE, memories);
 }
 
-function allMemorySummaryFinal() {
-  const list = getMemoryListFinal().map(normalizeMemoryFinal);
-  if (!list.length) return "No saved football memory found yet.";
-
-  return list.map(function (m, i) {
-    return "#" + (i + 1) + " " + m.team + " (" + m.confidence + "%)";
-  }).join(" • ");
-}
-
-function answerFinal(prompt, selectedTeam) {
-  const latest = latestMemoryFinal();
-  const q = String(prompt || "").toLowerCase();
-  const proof = latest.proof || "MemWal proof visible in Memory Proof card";
-
-  if (q.includes("which team") || q.includes("backing")) {
-    return "You are currently backing " + latest.team + ". Proof: " + proof;
-  }
-
-  if (q.includes("loyalty")) {
-    const team = selectedTeam || latest.team;
-    const score = scoreForTeamFinal(team);
-    return "Your loyalty score is " + score + "%. Selected team: " + team + ". Latest memory team: " + latest.team + ".";
-  }
-
-  if (q.includes("show my football") || q.includes("memory")) {
-    return "Your saved football memories are: " + allMemorySummaryFinal() + ". Latest proof: " + proof;
-  }
-
-  if (q.includes("compare")) {
-    const argentina = scoreForTeamFinal("Argentina");
-    const brazil = scoreForTeamFinal("Brazil");
-    return "Argentina loyalty score is " + argentina + "%. Brazil loyalty score is " + brazil + "%. Latest memory team: " + latest.team + ".";
-  }
-
-  if (q.includes("roast")) {
-    return "Your latest " + latest.team + " prediction is bold. Confidence: " + latest.confidence + "%. MemWal proof: " + proof;
-  }
-
-  if (q.includes("still alive") || q.includes("survival")) {
-    return "Your prediction is still active. Latest prediction team: " + latest.team + ". Proof: " + proof;
-  }
-
-  if (q.includes("match context")) {
-    return latest.team + " match context is ready. This World Cup fan prediction is tracked through The 12th Memory.";
-  }
-
-  if (q.includes("schedule")) {
-    return "World Cup 2026 schedule context is ready for this memory agent.";
-  }
-
-  return "I remember your latest World Cup memory. Latest team: " + latest.team + ". Proof: " + proof;
-}
-
-app.post("/api/agent-reply", function (req, res) {
-  const prompt = (req.body && (req.body.message || req.body.prompt || req.body.text)) || "";
-  const selectedTeam = req.body && req.body.team;
-  const reply = answerFinal(prompt, selectedTeam);
-
-  res.json({
-    success: true,
-    reply: reply,
-    message: reply,
-    answer: reply,
-    memories: getMemoryListFinal()
-  });
-});
-app.post("/api/chat", function (req, res) {
-  const prompt = (req.body && (req.body.message || req.body.prompt || req.body.text)) || "";
-  const selectedTeam = req.body && req.body.team;
-  const reply = answerFinal(prompt, selectedTeam);
-
-  res.json({
-    success: true,
-    reply: reply,
-    message: reply,
-    answer: reply,
-    memories: getMemoryListFinal()
-  });
-});
-
-app.get("/api/match-context", function (req, res) {
-  const team = req.query.team || latestMemoryFinal().team;
-
-  const contexts = {
-    Argentina: "Argentina has elite World Cup history, strong fan loyalty, and high tournament pressure.",
-    Brazil: "Brazil is always a World Cup favorite with attacking flair, deep football culture, and strong fan expectations.",
-    England: "England has a talented squad, high media pressure, and a fanbase that expects a deep tournament run.",
-    France: "France has world-class depth, recent tournament success, and strong knockout-stage potential.",
-    Portugal: "Portugal has technical quality, experienced leaders, and strong dark-horse potential."
-  };
-
-  const context = contexts[team] || team + " is saved as a World Cup fan prediction.";
-
-  res.json({
-    success: true,
-    team: team,
-    context: context,
-    message: context,
-    reply: context
-  });
-});
-
-app.get("/api/upcoming-schedule", function (req, res) {
-  res.json({
-    success: true,
-    message: "World Cup 2026 schedule ready",
-    reply: "World Cup 2026 schedule ready",
-    schedule: [
-      { date: "June 11, 2026", match: "Mexico vs South Africa", stage: "Opening Match" },
-      { date: "June 12, 2026", match: "Canada vs TBD", stage: "Group Stage" },
-      { date: "June 13, 2026", match: "USA vs TBD", stage: "Group Stage" }
-    ]
-  });
-});
-
-app.get("/api/schedule", function (req, res) {
-  res.redirect("/api/upcoming-schedule");
-});
-
-function loyaltyResponseFinal(req, res) {
-  const team = req.query.team || latestMemoryFinal().team;
-  const score = scoreForTeamFinal(team);
-  const latest = latestMemoryFinal();
-
-  const msg = "Your loyalty score is " + score + "%. Selected team: " + team + ". Latest memory team: " + latest.team + ".";
-
-  res.json({
-    success: true,
-    score: score,
-    team: team,
-    selectedTeam: team,
-    latestTeam: latest.team,
-    message: msg,
-    reply: msg
+function getSortedMemories() {
+  return loadMemoryIndex().sort((a, b) => {
+    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
   });
 }
 
-app.get("/api/loyalty", loyaltyResponseFinal);
-app.get("/api/quick-loyalty", loyaltyResponseFinal);
-app.get("/api/loyalty-check", loyaltyResponseFinal);
+function addMemoryToIndex(memory) {
+  const oldMemories = loadMemoryIndex();
 
-app.get("/api/demo-stats", function (req, res) {
-  const latest = latestMemoryFinal();
-  const team = req.query.team || latest.team;
-  const score = scoreForTeamFinal(team);
+  const alreadyExists = oldMemories.some(
+    (item) => item.blobId && item.blobId === memory.blobId
+  );
 
-  res.json({
-    success: true,
-    total: getMemoryListFinal().length,
-    latestTeam: latest.team,
-    selectedTeam: team,
-    score: score,
-    latest: latest,
-    memories: getMemoryListFinal().map(normalizeMemoryFinal)
+  if (!alreadyExists) {
+    oldMemories.unshift(memory);
+    saveMemoryIndex(oldMemories);
+  }
+
+  return oldMemories;
+}
+
+/* ---------------- ROAST INDEX ---------------- */
+
+function loadRoastIndex() {
+  return loadJsonFile(ROAST_INDEX_FILE);
+}
+
+function saveRoastIndex(roasts) {
+  saveJsonFile(ROAST_INDEX_FILE, roasts);
+}
+
+function getSortedRoasts() {
+  return loadRoastIndex().sort((a, b) => {
+    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
   });
+}
+
+function addRoastToIndex(roast) {
+  const oldRoasts = loadRoastIndex();
+  oldRoasts.unshift(roast);
+  saveRoastIndex(oldRoasts);
+  return roast;
+}
+
+/* ---------------- GENERAL HELPERS ---------------- */
+
+function getBlobId(result) {
+  return (
+    result?.blob_id ||
+    result?.blobId ||
+    result?.blob?.id ||
+    result?.data?.blob_id ||
+    result?.data?.blobId ||
+    null
+  );
+}
+
+function getJobId(result) {
+  return (
+    result?.job_id ||
+    result?.jobId ||
+    result?.id ||
+    result?.data?.job_id ||
+    result?.data?.jobId ||
+    null
+  );
+}
+
+function buildProofUrl(blobId) {
+  if (!blobId) return null;
+  return `${WALRUS_AGGREGATOR_URL}/${blobId}`;
+}
+
+function safeText(value) {
+  return String(value || "").trim();
+}
+
+function cleanTeam(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function cleanMood(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+/* ---------------- HEALTH ---------------- */
+
+app.get("/api/health", async (req, res) => {
+  try {
+    const memwal = await getMemWal();
+
+    let health = null;
+    if (typeof memwal.health === "function") {
+      health = await memwal.health();
+    }
+
+    res.json({
+      success: true,
+      app: "The 12th Memory",
+      storage: "Walrus Memory MemWal",
+      namespace: MEMWAL_NAMESPACE,
+      serverUrl: MEMWAL_SERVER_URL,
+      health,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
 });
-// END FINAL WORKING API OVERRIDES
 
-
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function buildMemoryFromRequest(body) {
-  const team =
-    body.team ||
-    body.selectedTeam ||
-    body.favoriteTeam ||
-    body.predictionTeam ||
-    "Unknown";
-
-  const confidence =
-    body.confidence ||
-    body.confidenceScore ||
-    body.score ||
-    "80";
-
-  const prediction =
-    body.prediction ||
-    body.message ||
-    body.memory ||
-    body.text ||
-    ("I backed " + team + " with " + confidence + "% confidence.");
-
-  return {
-    id: "memory_" + Date.now(),
-    team: team,
-    confidence: confidence,
-    prediction: prediction,
-    createdAt: nowIso()
-  };
-}
-
-function buildWalrusExplorer(walrusResult) {
-  if (!walrusResult) return null;
-
-  if (walrusResult.explorerUrl) {
-    return walrusResult.explorerUrl;
-  }
-
-  if (walrusResult.blobObjectId) {
-    return "https://suivision.xyz/object/" + walrusResult.blobObjectId;
-  }
-
-  if (walrusResult.blobId && String(walrusResult.blobId).startsWith("0x")) {
-    return "https://suivision.xyz/object/" + walrusResult.blobId;
-  }
-
-  if (walrusResult.txDigest) {
-    return "https://suivision.xyz/txblock/" + walrusResult.txDigest;
-  }
-
-  return null;
-}
+/* ---------------- SAVE MEMORY ---------------- */
 
 async function saveMemoryHandler(req, res) {
-  const newMemory = buildMemoryFromRequest(req.body);
-
   try {
-    const walrusResult = await storeMemoryOnMemWal(newMemory);
+    const body = req.body || {};
 
-    const proof =
-      walrusResult.blobObjectId ||
-      walrusResult.blobId ||
-      walrusResult.txDigest ||
-      "walrus_mainnet_saved";
+    const name = safeText(body.name) || "World Cup Fan";
+    const team = safeText(body.team) || "Unknown Team";
+    const predictionType = safeText(body.predictionType) || "Active Prediction";
 
-    const explorer = buildWalrusExplorer(walrusResult);
+    const prediction =
+      safeText(body.prediction) ||
+      safeText(body.memory) ||
+      safeText(body.message) ||
+      safeText(body.content);
 
-    newMemory.walrusProof = proof;
-    newMemory.walrusExplorer = explorer;
-    newMemory.storage = "Walrus Memory / MemWal";
-    newMemory.walrusStatus = "success";
+    const mood = safeText(body.mood) || "Loyal";
+    const confidence = Number(body.confidence || body.loyaltyScore || 80);
 
-    memories.unshift(newMemory);
+    if (!prediction) {
+      return res.status(400).json({
+        success: false,
+        error: "Prediction / memory text missing",
+      });
+    }
 
-    console.log("WALRUS PROOF SAVED:", {
-      proof: newMemory.walrusProof,
-      explorer: newMemory.walrusExplorer,
-      storage: newMemory.storage
-    });
+    const readableMemory = {
+      app: "The 12th Memory",
+      type: "world_cup_fan_prediction",
+      name,
+      team,
+      predictionType,
+      prediction,
+      mood,
+      confidence,
+      createdAt: new Date().toISOString(),
+    };
 
-    return res.json({
+    const memoryText = JSON.stringify(readableMemory, null, 2);
+
+    const memwal = await getMemWal();
+
+    console.log("Saving memory to MemWal...");
+    console.log("Team:", team);
+    console.log("Prediction:", prediction);
+    console.log("Mood:", mood);
+
+    let storedResult;
+
+    if (typeof memwal.rememberAndWait === "function") {
+      storedResult = await memwal.rememberAndWait(memoryText);
+    } else {
+      const accepted = await memwal.remember(memoryText);
+      const jobId = getJobId(accepted);
+
+      console.log("MEMWAL REMEMBER JOB:", accepted);
+
+      if (!jobId) {
+        throw new Error("MemWal remember() did not return job_id");
+      }
+
+      storedResult = await memwal.waitForRememberJob(jobId);
+    }
+
+    const blobId = getBlobId(storedResult);
+
+    if (!blobId) {
+      throw new Error("Memory saved but blob_id not found in MemWal response");
+    }
+
+    const proofUrl = buildProofUrl(blobId);
+
+    const savedMemory = {
+      id: blobId,
+      name,
+      team,
+      predictionType,
+      prediction,
+      mood,
+      confidence,
+      blobId,
+      proofUrl,
+      storage: "Walrus Mainnet",
+      sdk: "MemWal",
+      namespace: MEMWAL_NAMESPACE,
+      createdAt: readableMemory.createdAt,
+    };
+
+    addMemoryToIndex(savedMemory);
+
+    console.log("MEMWAL FINAL RESULTS");
+    console.log("blob_id:", blobId);
+    console.log("proof:", proofUrl);
+    console.log("WALRUS PROOF SAVED");
+
+    res.json({
       success: true,
-      message: "Memory saved. I will remember that " + newMemory.prediction,
-      memory: newMemory,
-      proof: newMemory.walrusProof,
-      walrusProof: newMemory.walrusProof,
-      explorer: newMemory.walrusExplorer,
-      walrusExplorer: newMemory.walrusExplorer,
-      storage: newMemory.storage,
-      memories: memories
+      message: "Memory saved on Walrus Mainnet",
+      memory: savedMemory,
+      blobId,
+      proofUrl,
+      raw: storedResult,
     });
-  } catch (err) {
-    console.error("Walrus Mainnet upload failed:", err);
+  } catch (error) {
+    console.error("Save memory error:", error);
 
-    newMemory.walrusProof = "walrus_upload_failed_check_render_logs";
-    newMemory.walrusExplorer = null;
-    newMemory.storage = "Walrus Mainnet upload failed";
-    newMemory.walrusStatus = "failed";
-    newMemory.error = err && err.message ? err.message : String(err);
-
-    memories.unshift(newMemory);
-
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
-      message: "Walrus upload failed: " + newMemory.error,
-      error: newMemory.error,
-      memory: newMemory,
-      proof: newMemory.walrusProof,
-      walrusProof: newMemory.walrusProof,
-      storage: newMemory.storage,
-      memories: memories
+      error: error.message,
+      message: error.message,
     });
   }
 }
 
-function chatHandler(req, res) {
-  const text = String(req.body.message ||  req.body.text  || "").toLowerCase();
+app.post("/api/save-memory", saveMemoryHandler);
+app.post("/api/memory", saveMemoryHandler);
+app.post("/api/remember", saveMemoryHandler);
+app.post("/save-memory", saveMemoryHandler);
 
-  if (text.includes("loyalty")) {
-    const latest = memories[0];
-    return res.json({
-      success: true,
-      reply: latest
-        ? "Your loyalty score is 80%. Latest team: " + latest.team + "."
-        : "Your loyalty score will appear after you save a prediction.",
-      memories: memories
-    });
-  }
-if (text.includes("prediction") || text.includes("remember")) {
-    const latest = memories[0];
-    return res.json({
-      success: true,
-      reply: latest
-        ? "I remember your latest prediction: " + latest.prediction + ". Proof: " + latest.walrusProof
-        : "No saved memory yet. Save a World Cup prediction first.",
-      memories: memories
-    });
-  }
+/* ---------------- GET MEMORIES ---------------- */
 
-  if (text.includes("match")) {
-    return res.json({
-      success: true,
-      reply: "Match context ready: World Cup 2026 fan memories, predictions, loyalty score, and survival status are tracked through The 12th Memory.",
-      memories: memories
-    });
-  }
+app.get("/api/memories", (req, res) => {
+  const memories = getSortedMemories();
 
-  if (text.includes("survival")) {
-    return res.json({
-      success: true,
-      reply: memories.length > 0
-        ? "Your prediction is still alive in the Memory Timeline."
-        : "Save a prediction first to activate survival status.",
-      memories: memories
-    });
-  }
-
-  return res.json({
-    success: true,
-    reply: "Welcome to The 12th Memory. Save a World Cup prediction, then ask me to remember, compare, roast, check match context, or show survival status.",
-    memories: memories
-  });
-}
-
-app.get("/api/health", function (req, res) {
-  res.json({
-    success: true,
-    status: "online",
-    project: "The 12th Memory",
-    storage: "Walrus Mainnet",
-    time: nowIso()
-  });
-});
-
-app.get("/api/memories", function (req, res) {
   res.json({
     success: true,
     count: memories.length,
-    memories: memories
+    memories,
   });
 });
 
-app.post("/api/chat", chatHandler);
-app.post("/chat", chatHandler);
+/* ---------------- GET ROASTS ---------------- */
 
-app.post("/api/save-memory", saveMemoryHandler);
-app.post("/api/memory/save", saveMemoryHandler);
-app.post("/api/save-prediction", saveMemoryHandler);
-app.post("/api/prediction", saveMemoryHandler);
-app.post("/save-memory", saveMemoryHandler);
-app.post("/save-prediction", saveMemoryHandler);
-
-app.use(function (req, res) {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-
-
-
-// World Cup match context API
-app.get("/api/match-context", function (req, res) {
-  const team = req.query.team || "Argentina";
-
-  const contexts = {
-    Argentina: "Argentina has elite World Cup history, strong fan loyalty, and high tournament pressure. This memory is tracked as a serious fan prediction.",
-    Brazil: "Brazil is always a World Cup favorite with attacking flair, deep football culture, and strong fan expectations.",
-    England: "England has a talented squad, high media pressure, and a fanbase that expects a deep tournament run.",
-    France: "France has world-class depth, recent tournament success, and strong knockout-stage potential.",
-    Portugal: "Portugal has technical quality, experienced leaders, and strong dark-horse potential."
-  };
+app.get("/api/roasts", (req, res) => {
+  const roasts = getSortedRoasts();
 
   res.json({
     success: true,
-    team: team,
-    context: contexts[team] || `${team} is saved as the latest World Cup fan prediction. The agent can remember, compare, and recall this fan memory.`
+    count: roasts.length,
+    roasts,
   });
 });
 
-// World Cup upcoming schedule API
-app.get("/api/upcoming-schedule", function (req, res) {
-  res.json({
-    success: true,
-    schedule: [
-      { date: "June 11, 2026", match: "Mexico vs South Africa", stage: "Opening Match" },
-      { date: "June 12, 2026", match: "Canada vs TBD", stage: "Group Stage" },
-      { date: "June 13, 2026", match: "USA vs TBD", stage: "Group Stage" }
-    ]
-  });
-});
+/* ---------------- QUICK LOYALTY BACKEND ---------------- */
 
-
-
-
-// Real demo stats API for loyalty and latest memory
-app.get("/api/demo-stats", function (req, res) {
-  const memoryList = (typeof memories !== "undefined" && Array.isArray(memories)) ? memories : [];
-
-  const clean = memoryList.map(function (m) {
-    return {
-      team: m.team || m.latestTeam || "World Cup Team",
-      confidence: Number(m.confidence || 80),
-      prediction: m.prediction || m.text || "",
-      proof: m.proof || m.blobId || m.blob_id || "",
-      status: m.status || "Active Prediction"
-    };
-  });
-
-  const latest = clean.length ? clean[clean.length - 1] : {
-    team: "World Cup Team",
-    confidence: 80,
-    prediction: "",
-    proof: "",
-    status: "Active Prediction"
-  };
-
-  const selectedTeam = req.query.team || latest.team;
-  const total = clean.length || 1;
-
-  const sameTeam = clean.filter(function (m) {
-    return String(m.team).toLowerCase() === String(selectedTeam).toLowerCase();
-  }).length;
-
-  const score = clean.length ? Math.round((sameTeam / total) * 100) : 0;
-
-  res.json({
-    success: true,
-    total: clean.length,
-    latestTeam: latest.team,
-    selectedTeam: selectedTeam,
-    score: score,
-    latest: latest,
-    memories: clean
-  });
-});
-
-
-
-
-// Stable demo support APIs
-function getSavedMemoriesSafe() {
+app.post("/api/agent-reply", (req, res) => {
   try {
-    if (typeof memories !== "undefined" && Array.isArray(memories)) return memories;
-  } catch (e) {}
-  return [];
-}
+    const selectedTeam = safeText(req.body?.team);
+    const memories = getSortedMemories();
 
-function cleanTeamName(team) {
-  return team || "Brazil";
-}
+    if (!memories.length) {
+      return res.json({
+        success: true,
+        reply: `Final Loyalty Score: 0%\nSelected team: ${selectedTeam}\nReason: No saved memories found yet.`,
+      });
+    }
 
-function latestMemorySafe() {
-  const list = getSavedMemoriesSafe();
-  if (list.length) return list[list.length - 1];
-  return {
-    name: "World Cup Fan",
-    team: "Brazil",
-    confidence: 80,
-    prediction: "Latest World Cup fan prediction",
-    mood: "Confident",
-    proof: ""
-  };
-}
+    const totalMemories = memories.length;
 
-function loyaltyScoreForTeam(team) {
-  const list = getSavedMemoriesSafe();
-  if (!list.length) return 0;
+    const matched = memories.filter(
+      (memory) => cleanTeam(memory.team) === cleanTeam(selectedTeam)
+    );
 
-  const selected = String(team || latestMemorySafe().team || "").toLowerCase();
-  const same = list.filter(function (m) {
-    return String(m.team || "").toLowerCase() === selected;
-  }).length;
+    const score = Math.round((matched.length / totalMemories) * 100);
 
-  return Math.round((same / list.length) * 100);
-}
+    res.json({
+      success: true,
+      reply:
+        `Final Loyalty Score: ${score}%\n` +
+        `Selected team: ${selectedTeam}\n` +
+        `Saved memories for this team: ${matched.length}/${totalMemories}\n` +
+        `Reason: Score is based on real saved memory count.`,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      reply: "Agent error. Check backend terminal.",
+    });
+  }
+});
 
-app.get("/api/match-context", function (req, res) {
-  const team = cleanTeamName(req.query.team || latestMemorySafe().team);
+/* ---------------- AI CHAT AGENT ---------------- */
 
-  const contexts = {
-    Argentina: "Argentina has elite World Cup history, strong fan loyalty, and high tournament pressure.",
-    Brazil: "Brazil is always a World Cup favorite with attacking flair, deep football culture, and strong fan expectations.",
-    England: "England has a talented squad, high media pressure, and a fanbase that expects a deep tournament run.",
-    France: "France has world-class depth, recent tournament success, and strong knockout-stage potential.",
-    Portugal: "Portugal has technical quality, experienced leaders, and strong dark-horse potential."
-  };
+app.post("/api/chat", (req, res) => {
+  try {
+    const message = safeText(req.body?.message).toLowerCase();
+    const memories = getSortedMemories();
 
+    if (!memories.length) {
+      return res.json({
+        success: true,
+        reply:
+          "No saved memory yet. Save a World Cup prediction first, then I can remember, compare, roast, check loyalty, or show survival status.",
+      });
+    }
+
+    const latest = memories[0];
+
+    const teams = [
+      "Argentina",
+      "Brazil",
+      "France",
+      "England",
+      "Portugal",
+      "Germany",
+      "Spain",
+      "Netherlands",
+      "Italy",
+      "Uruguay",
+      "Belgium",
+      "Croatia",
+      "Japan",
+      "Mexico",
+      "USA",
+      "Canada",
+    ];
+
+    function teamMemories(team) {
+      return memories.filter((m) => cleanTeam(m.team) === cleanTeam(team));
+    }
+
+    function countScoreForTeam(team) {
+      const matched = teamMemories(team);
+      const score = Math.round((matched.length / memories.length) * 100);
+
+      return {
+        score,
+        matched,
+        reason: `${matched.length}/${memories.length} memories`,
+      };
+    }
+
+    function findTeamsInMessage(text) {
+      return teams.filter((team) => text.includes(team.toLowerCase()));
+    }
+
+    if (message.includes("which team") || message.includes("backing")) {
+      return res.json({
+        success: true,
+        reply:
+          `You are currently backing ${latest.team}. ` +
+          `Your latest prediction is: "${latest.prediction}". ` +
+          `Mood: ${latest.mood || "Loyal"}. ` +
+          `Confidence: ${latest.confidence || 80}%.`,
+      });
+    }
+
+    /* -------- ROAST READY MEMORY SEARCH + SAVE + REUSE -------- */
+
+    if (message.includes("roast")) {
+      const roasts = getSortedRoasts();
+
+      let targetMemory = memories.find((memory) => {
+        return cleanMood(memory.mood) === "roast ready";
+      });
+
+      const mentionedTeams = findTeamsInMessage(message);
+      if (mentionedTeams.length > 0) {
+        const mentionedTeamMemory = memories.find((memory) => {
+          return cleanTeam(memory.team) === cleanTeam(mentionedTeams[0]);
+        });
+
+        if (mentionedTeamMemory) {
+          targetMemory = mentionedTeamMemory;
+        }
+      }
+
+      if (!targetMemory) {
+        targetMemory = latest;
+      }
+
+      const alreadyRoasted = roasts.find((roast) => {
+        return (
+          roast.memoryBlobId &&
+          targetMemory.blobId &&
+          roast.memoryBlobId === targetMemory.blobId
+        );
+      });
+
+      if (alreadyRoasted) {
+        return res.json({
+          success: true,
+          reply:
+            `Last saved roast for ${alreadyRoasted.team}:\n` +
+            `${alreadyRoasted.roastText}\n\n` +
+            `Matched memory mood: ${alreadyRoasted.mood || "Roast Ready"}\n` +
+            `Matched memory proof: ${alreadyRoasted.memoryBlobId}`,
+        });
+      }
+
+      const roastText =
+        `${targetMemory.team}? Bold choice 😄 ` +
+        `Prediction: "${targetMemory.prediction}". ` +
+        `Type: ${targetMemory.predictionType || "Active Prediction"}. ` +
+        `Mood: ${targetMemory.mood || "Roast Ready"}. ` +
+        `Confidence: ${targetMemory.confidence || 80}%. ` +
+        `I hope this prediction survives better than a group-stage upset.`;
+
+      const savedRoast = addRoastToIndex({
+        id: `${targetMemory.blobId || Date.now()}-roast`,
+        team: targetMemory.team,
+        prediction: targetMemory.prediction,
+        predictionType: targetMemory.predictionType,
+        confidence: targetMemory.confidence,
+        mood: targetMemory.mood,
+        memoryBlobId: targetMemory.blobId,
+        memoryProofUrl: targetMemory.proofUrl,
+        roastText,
+        createdAt: new Date().toISOString(),
+      });
+
+      return res.json({
+        success: true,
+        reply:
+          `Roast saved for ${savedRoast.team}:\n` +
+          `${savedRoast.roastText}\n\n` +
+          `Reason: I searched Memory Timeline and selected the memory with Fan Mood = Roast Ready.`,
+      });
+    }
+
+    /* -------- SHOW FOOTBALL MEMORY: TEAM NAMES ONLY -------- */
+
+    if (
+      message.includes("show my football memory") ||
+      message.includes("show my memory") ||
+      message.includes("remember")
+    ) {
+      const teamNames = memories
+        .map((memory, index) => {
+          const tag = index === 0 ? "Latest" : `Memory ${index + 1}`;
+          return `${tag}: ${memory.team}`;
+        })
+        .join("\n");
+
+      return res.json({
+        success: true,
+        reply:
+          `Your saved football memory teams:\n\n` +
+          `${teamNames}\n\n` +
+          `Latest active team: ${latest.team}`,
+      });
+    }
+
+    if (message.includes("compare")) {
+      const mentionedTeams = findTeamsInMessage(message);
+
+      if (mentionedTeams.length >= 2) {
+        const teamA = mentionedTeams[0];
+        const teamB = mentionedTeams[1];
+
+        const scoreA = countScoreForTeam(teamA);
+        const scoreB = countScoreForTeam(teamB);
+
+        return res.json({
+          success: true,
+          reply:
+            `${teamA} vs ${teamB} memory comparison:\n\n` +
+            `${teamA}: ${scoreA.score}% loyalty · ${scoreA.reason}\n` +
+            `${teamB}: ${scoreB.score}% loyalty · ${scoreB.reason}\n\n` +
+            `Latest active prediction: ${latest.team}.`,
+        });
+      }
+
+      return res.json({
+        success: true,
+        reply:
+          `Your latest active prediction is ${latest.team}. ` +
+          `Saved teams: ${[...new Set(memories.map((m) => m.team))].join(", ")}.`,
+      });
+    }
+
+    /* -------- COUNT-BASED LOYALTY SCORE -------- */
+
+    if (message.includes("loyalty")) {
+      const totalMemories = memories.length;
+
+      const teamCounts = {};
+
+      memories.forEach((memory) => {
+        const team = memory.team || "Unknown";
+        teamCounts[team] = (teamCounts[team] || 0) + 1;
+      });
+
+      const latestTeamCount = teamCounts[latest.team] || 0;
+      const latestTeamScore = Math.round((latestTeamCount / totalMemories) * 100);
+
+      const strongestTeam = Object.entries(teamCounts).sort((a, b) => b[1] - a[1])[0];
+      const strongestTeamName = strongestTeam[0];
+      const strongestTeamCount = strongestTeam[1];
+      const strongestTeamScore = Math.round((strongestTeamCount / totalMemories) * 100);
+
+      const split = Object.entries(teamCounts)
+        .map(([team, count]) => {
+          const score = Math.round((count / totalMemories) * 100);
+          return `${team}: ${score}% · ${count}/${totalMemories} memories`;
+        })
+        .join("\n");
+
+      return res.json({
+        success: true,
+        reply:
+          `Your latest team loyalty score: ${latestTeamScore}%\n` +
+          `Latest team: ${latest.team} (${latestTeamCount}/${totalMemories} memories)\n\n` +
+          `Strongest loyalty: ${strongestTeamName} — ${strongestTeamScore}% (${strongestTeamCount}/${totalMemories} memories)\n\n` +
+          `Score split:\n${split}`,
+      });
+    }
+
+    if (message.includes("match context")) {
+      return res.json({
+        success: true,
+        reply:
+          `Match context ready. Your latest tracked team is ${latest.team}, and this prediction is saved in your Memory Timeline.`,
+      });
+    }
+
+    if (message.includes("schedule")) {
+      return res.json({
+        success: true,
+        reply:
+          "World Cup 2026 schedule context is ready. Save more predictions to build a stronger fan memory history.",
+      });
+    }
+
+    if (
+      message.includes("still alive") ||
+      message.includes("survival") ||
+      message.includes("alive")
+    ) {
+      return res.json({
+        success: true,
+        reply:
+          `Your ${latest.team} prediction is still active in the app. ` +
+          `Prediction: "${latest.prediction}". ` +
+          `Confidence: ${latest.confidence}%. ` +
+          `Mood: ${latest.mood || "Loyal"}. ` +
+          `MemWal proof: ${latest.blobId}`,
+      });
+    }
+
+    return res.json({
+      success: true,
+      reply:
+        `I remember your latest World Cup memory: ${latest.team} — ${latest.prediction}. ` +
+        `Mood: ${latest.mood || "Loyal"}.`,
+    });
+  } catch (error) {
+    console.error("Chat error:", error);
+
+    res.status(500).json({
+      success: false,
+      reply: "Chat agent error. Check backend terminal.",
+    });
+  }
+});
+
+/* ---------------- OPTIONAL MATCH / SCHEDULE API ---------------- */
+
+app.get("/api/match-context", (req, res) => {
   res.json({
     success: true,
-    team: team,
-    context: contexts[team] || team + " is saved as the latest World Cup fan prediction.",
-    message: contexts[team] || team + " is saved as the latest World Cup fan prediction."
+    matches: [
+      "World Cup 2026 context ready",
+      "Fan predictions are tracked with Walrus proof",
+      "Memory timeline updates after every saved prediction",
+    ],
   });
 });
 
-app.get("/api/upcoming-schedule", function (req, res) {
+app.get("/api/schedule", (req, res) => {
   res.json({
     success: true,
-    message: "World Cup 2026 schedule ready",
     schedule: [
-      { date: "June 11, 2026", match: "Mexico vs South Africa", stage: "Opening Match" },
-      { date: "June 12, 2026", match: "Canada vs TBD", stage: "Group Stage" },
-      { date: "June 13, 2026", match: "USA vs TBD", stage: "Group Stage" }
-    ]
+      "World Cup 2026 schedule ready",
+      "Group stage and knockout predictions can be saved",
+      "More schedule data can be added later",
+    ],
   });
 });
 
-app.get("/api/schedule", function (req, res) {
-  res.redirect("/api/upcoming-schedule");
+/* ---------------- RECALL FROM MEMWAL ---------------- */
+
+app.post("/api/recall", async (req, res) => {
+  try {
+    const query =
+      safeText(req.body?.query) ||
+      safeText(req.body?.prediction) ||
+      "World Cup fan predictions";
+
+    const limit = Number(req.body?.limit || 5);
+    const memwal = await getMemWal();
+
+    if (typeof memwal.recall !== "function") {
+      return res.json({
+        success: false,
+        error: "MemWal recall method not available in this SDK version",
+      });
+    }
+
+    const recalled = await memwal.recall({
+      query,
+      limit,
+    });
+
+    res.json({
+      success: true,
+      query,
+      results: recalled.results || recalled,
+    });
+  } catch (error) {
+    console.error("Recall error:", error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
 });
 
-app.get("/api/quick-loyalty", function (req, res) {
-  const team = cleanTeamName(req.query.team || latestMemorySafe().team);
-  const score = loyaltyScoreForTeam(team);
+/* ---------------- CLEAR LOCAL INDEX ONLY ---------------- */
+
+app.delete("/api/memories", (req, res) => {
+  saveMemoryIndex([]);
 
   res.json({
     success: true,
-    team: team,
-    selectedTeam: team,
-    latestTeam: latestMemorySafe().team,
-    score: score,
-    message: "Your loyalty score is " + score + "%. Selected team: " + team + ". Latest memory team: " + latestMemorySafe().team + "."
+    message: "Local memory index cleared. Walrus blobs are not deleted.",
   });
 });
 
-app.get("/api/loyalty", function (req, res) {
-  const team = cleanTeamName(req.query.team || latestMemorySafe().team);
-  const score = loyaltyScoreForTeam(team);
+app.delete("/api/roasts", (req, res) => {
+  saveRoastIndex([]);
 
   res.json({
     success: true,
-    team: team,
-    selectedTeam: team,
-    latestTeam: latestMemorySafe().team,
-    score: score,
-    message: "Your loyalty score is " + score + "%. Selected team: " + team + ". Latest memory team: " + latestMemorySafe().team + "."
+    message: "Local roast index cleared.",
   });
 });
 
-app.get("/api/loyalty-check", function (req, res) {
-  const team = cleanTeamName(req.query.team || latestMemorySafe().team);
-  const score = loyaltyScoreForTeam(team);
+/* ---------------- STATIC FRONTEND ---------------- */
 
-  res.json({
-    success: true,
-    team: team,
-    selectedTeam: team,
-    latestTeam: latestMemorySafe().team,
-    score: score,
-    message: "Your loyalty score is " + score + "%. Selected team: " + team + ". Latest memory team: " + latestMemorySafe().team + "."
+if (fs.existsSync(PUBLIC_DIR)) {
+  app.use(express.static(PUBLIC_DIR));
+
+  app.get("/", (req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, "index.html"));
   });
-});
-// END Stable demo support APIs
+}
 
-app.listen(PORT, function () {
-  console.log("The 12th Memory running on port " + PORT);
-  console.log("Storage mode: Walrus Mainnet");
+/* ---------------- START SERVER ---------------- */
+
+app.listen(PORT, () => {
+  console.log(`The 12th Memory running on http://localhost:${PORT}`);
+  console.log(`MemWal namespace: ${MEMWAL_NAMESPACE}`);
+  console.log(`MemWal server: ${MEMWAL_SERVER_URL}`);
 });
