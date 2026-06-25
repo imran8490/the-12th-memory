@@ -1,36 +1,10 @@
 # The 12th Memory
 
-Every fan is the 12th man. Now their football memory has proof.
+**Every fan is the 12th man. Now their football memory has proof.**
 
-The 12th Memory is a World Cup 2026 AI fan memory hub. It lets football fans save predictions, track their changing opinions, and interact with an AI-style memory agent that recalls past predictions, checks loyalty, roasts inconsistent takes, and shows a prediction survival status.
+The 12th Memory is a World Cup 2026 AI fan memory app powered by **Walrus Mainnet** and **MemWal SDK**.
 
-This project is built for the Walrus Sessions / World Cup memory hackathon concept, where the main goal is to demonstrate persistent memory that changes an agent’s behavior over time.
-
----
-
-## Project Overview
-
-Football fans make bold predictions before and during major tournaments, but most of those takes disappear after the match is over.
-
-The 12th Memory turns those predictions into a persistent fan memory timeline. A user can save their favorite team, prediction type, confidence level, and fan mood. Later, the AI agent uses that saved memory to answer questions like:
-
-- Which team am I backing?
-- What is my loyalty score?
-- Roast my last prediction.
-- Is my prediction still alive?
-- Show my football memory.
-- Show upcoming schedule.
-- Compare Argentina vs Brazil.
-
-The project focuses on one simple idea:
-
-> A fan’s football memory should not disappear. It should be remembered, compared, and proven.
-
----
-
-## Tagline
-
-Every fan is the 12th man. Now their football memory has proof.
+Fans can save football predictions, store them through Walrus Memory, receive a real Blob ID proof, and interact with an AI-style fan memory agent that remembers team history, checks loyalty, compares predictions, and roasts memories marked as **Roast Ready**.
 
 ---
 
@@ -40,23 +14,63 @@ https://the-12th-memory.onrender.com/
 
 ---
 
-## Key Features
+## Project Overview
 
-### 1. AI Chat Agent
+Football fans make bold predictions before and during major tournaments, but most of those takes disappear after the match is over.
 
-The AI-style fan agent responds using saved prediction memory. It can recall previous predictions, compare team changes, generate roast-style replies, and explain the user’s loyalty score.
+The 12th Memory turns those predictions into persistent fan memories.
 
-Example:
+A user can save:
 
-User: Which team am I backing?
+- Name
+- Team
+- Prediction type
+- Prediction text
+- Confidence score
+- Fan mood
 
-Agent: You are currently backing England with 35% confidence. Your latest prediction is: "England might surprise everyone but I am not fully confident."
+Each prediction is stored through **MemWal SDK** on **Walrus Mainnet**, and the app returns a visible Blob ID proof.
+
+The AI Fan Memory Agent then uses saved memory history to answer:
+
+- Which team am I backing?
+- Show my football memory
+- Roast my last prediction
+- Compare Argentina vs Brazil
+- What is my loyalty score?
+- Is my prediction still alive?
+- Show match context
+- Show upcoming schedule
 
 ---
 
-### 2. Save Prediction
+## Core Idea
 
-Users can save a World Cup prediction with:
+> A fan’s football memory should not disappear.  
+> It should be remembered, compared, roasted, and proven.
+
+---
+
+## Key Features
+
+### 1. AI Fan Memory Agent
+
+The AI-style fan agent responds using saved football memory.
+
+Example prompts:
+
+- Which team am I backing?
+- Roast my last prediction
+- Show my football memory
+- Compare Argentina vs Brazil
+- What is my loyalty score?
+- Is my prediction still alive?
+
+---
+
+### 2. Save World Cup Prediction
+
+Users can save a prediction with:
 
 - Name
 - Team
@@ -67,311 +81,314 @@ Users can save a World Cup prediction with:
 
 Example:
 
-Team: Argentina  
-Prediction Type: Winner  
-Prediction: Argentina will win World Cup 2026  
-Confidence: 80%  
-Mood: Loyal  
+```txt
+Team: England
+Prediction Type: Dark Horse
+Prediction: England can surprise everyone in World Cup 2026
+Confidence: 75%
+Mood: Roast Ready
+````
 
 ---
 
-### 3. Memory Timeline
+### 3. Walrus Mainnet Storage
 
-Every saved prediction appears in the memory timeline with:
+Each saved memory is uploaded through **MemWal SDK** and stored on **Walrus Mainnet**.
 
-- Team
-- Prediction type
-- Date and time
-- Prediction text
-- Confidence
-- Mood
-- Survival status
-- Demo memory proof ID
+After saving, the app returns:
 
-This makes the memory visible and meaningful for users and judges.
-
----
-
-### 4. Loyalty Score
-
-The project calculates a fan loyalty score based on how consistent the user is with their team selections.
-
-If the user keeps supporting the same team, the loyalty score stays high. If the user keeps switching teams, the score drops.
+* Blob ID
+* Walrus proof link
+* Storage status
+* Memory timeline record
 
 Example:
 
-Fan Loyalty Score: 33%  
-First Team: Argentina  
-Latest Team: England  
+```txt
+Storage: Walrus Mainnet
+Blob ID: abc123...
+Proof: https://aggregator.walrus-mainnet.walrus.space/v1/blobs/abc123...
+```
+
+The raw Walrus blob acts as public proof, while the app shows the readable fan memory in the UI.
 
 ---
 
-### 5. Prediction Survival Meter
+### 4. Memory Timeline
 
-Each prediction gets a survival status based on demo World Cup match context.
+The Memory Timeline displays saved predictions with:
 
-Possible statuses:
+* Team
+* Prediction
+* Confidence
+* Mood
+* Blob ID
+* Walrus proof link
 
-- Alive ✅
-- In Danger ⚠️
-- Under VAR Review 👀
-- Waiting for Kickoff ⏳
+The app also keeps a local memory index so the frontend can reload readable memory history after refresh.
+
+---
+
+### 5. Quick Loyalty Check
+
+Loyalty score is calculated based on real saved memory count.
 
 Example:
 
-Argentina prediction: Alive ✅  
-Brazil prediction: In Danger ⚠️  
-England prediction: Waiting for Kickoff ⏳  
+If the user has 6 saved memories:
+
+```txt
+England: 2/6 = 33%
+Argentina: 1/6 = 17%
+Brazil: 1/6 = 17%
+Uruguay: 1/6 = 17%
+Portugal: 1/6 = 17%
+```
+
+This avoids fake fixed scores and makes loyalty based on actual prediction history.
 
 ---
 
-### 6. Match Context Board
+### 6. Roast Ready Memory
 
-The MVP includes demo World Cup match context. This avoids relying on paid or restricted live-score APIs while still demonstrating how match context can shape memory-based responses.
+If a saved prediction has Fan Mood set to **Roast Ready**, the agent searches the memory timeline and roasts that memory.
 
-Example demo match context:
+Example flow:
 
-Argentina 2 - 1 Brazil at 67'  
-France 0 - 0 Germany at 31'  
+```txt
+Portugal → Emotional
+England → Roast Ready
+Uruguay → Overconfident
+```
+
+When the user clicks:
+
+```txt
+Roast my last prediction
+```
+
+The agent finds the **England Roast Ready** memory and roasts it.
+
+Roasts are saved locally so the same memory can return the same saved roast again.
 
 ---
 
-### 7. Upcoming Schedule
+### 7. Prediction Survival Status
 
-The app includes a demo World Cup 2026 schedule so the agent can reference upcoming matches and remind users about future prediction opportunities.
+The agent can check whether the latest saved prediction is still active inside the app.
 
 Example:
 
-England vs Portugal  
-13 Jun 2026 - 00:30  
-AT&T Stadium  
+```txt
+Your Uruguay prediction is still active in the app.
+Confidence: 46%
+Mood: Overconfident
+MemWal proof: abc123...
+```
 
 ---
 
 ### 8. Walrus Memory Console
 
-The current MVP shows a Walrus-style memory console with:
+The Walrus Memory Console shows:
 
-- Storage mode
-- Saved memories count
-- Loyalty score
-- Latest team
-- Prediction survival
-- Memory proof ID
-
-Current version uses local JSON demo storage. The next step is to replace demo storage with Walrus Mainnet memory storage and show real Walrus blob/object proof.
-
----
-
-## Why This Project Is Different
-
-This is not just a prediction form or a roast app.
-The 12th Memory combines:
-
-- Persistent fan memory
-- AI-style responses
-- Football prediction history
-- Loyalty scoring
-- Prediction survival status
-- Match context
-- Public memory timeline
-- Walrus-style proof console
-
-The core idea is that the agent’s behavior changes because of what it learned earlier.
-
-Example before/after moment:
-
-Day 1:  
-User saves: Argentina will win World Cup 2026 with 80% confidence.
-
-Later:  
-User saves: England might surprise everyone with 35% confidence.
-
-Agent:  
-You first backed Argentina, but now you are looking at England. Your loyalty score is dropping. The 12th Memory has receipts.
+* Storage mode
+* Saved memories count
+* Loyalty score
+* Latest team
+* Prediction survival
+* Latest memory proof
 
 ---
 
 ## Tech Stack
 
-- Node.js
-- Express.js
-- HTML
-- CSS
-- JavaScript
-- Local JSON storage for MVP
-- Walrus Mainnet integration planned
+* Node.js
+* Express.js
+* HTML
+* CSS
+* JavaScript
+* MemWal SDK
+* Walrus Mainnet
+* Local JSON index for readable timeline and roast history
 
 ---
 
 ## Project Structure
 
+```txt
 the-12th-memory/
-  index.js
-  package.json
-  package-lock.json
-  public/
-    index.html
-    style.css
-    dashboard.js
-  README.md
+├── index.js
+├── package.json
+├── package-lock.json
+├── public/
+│   ├── index.html
+│   ├── dashboard.js
+│   └── style.css
+├── memory-index.json
+├── roast-index.json
+├── README.md
+└── .env
+```
+
+---
+
+## Environment Variables
+
+Create a `.env` file:
+
+```env
+PORT=10000
+
+MEMWAL_PRIVATE_KEY=your_memwal_registered_private_key
+MEMWAL_ACCOUNT_ID=your_memwal_account_id
+MEMWAL_SERVER_URL=https://relayer.memory.walrus.xyz
+MEMWAL_NAMESPACE=the-12th-memory
+
+WALRUS_AGGREGATOR_URL=https://aggregator.walrus-mainnet.walrus.space/v1/blobs
+```
+
+Important:
+
+```txt
+Do not upload .env to GitHub.
+```
 
 ---
 
 ## Installation
 
-Clone the repository:
-
+```bash
 git clone https://github.com/imran8490/the-12th-memory.git
-
 cd the-12th-memory
-
-Install dependencies:
-
 npm install
-
-Run the app:
-
-npm start
-
-Open in browser:
-
-http://localhost:3000
+```
 
 ---
 
-## Usage Flow
+## Run Locally
 
-1. Open the app.
-2. Go to Save Prediction.
-3. Enter your name, team, prediction, confidence, and mood.
-4. Click Save Memory.
-5. Ask the AI agent questions:
-   - Which team am I backing?
-   - Roast my last prediction.
-   - What is my loyalty score?
-   - Is my prediction still alive?
-   - Show match context.
-   - Show upcoming schedule.
-6. View the saved prediction in Memory Timeline.
-7. Check memory proof and stats in Walrus Console.
+```bash
+node index.js
+```
+
+Open:
+
+```txt
+http://localhost:10000
+```
 
 ---
 
-## Demo Prompts
+## API Routes
 
-Try these prompts in the AI Chat Agent:
+### Save Memory
 
-- Which team am I backing?
-- Roast my last prediction
-- Show my football memory
-- Compare Argentina vs Brazil
-- What is my loyalty score?
-- Show match context
-- Show upcoming schedule
-- Is my prediction still alive?
+```txt
+POST /api/save-memory
+```
 
----
+Stores a fan prediction through MemWal SDK and returns Walrus proof data.
 
-## Example Agent Responses
+### Get Memories
 
-You are currently backing England with 35% confidence. Your latest prediction is: "England might surprise everyone but I am not fully confident."
+```txt
+GET /api/memories
+```
 
-Roast mode activated 😭 You backed England with 35% confidence. Prediction status: ⏳ Waiting for Kickoff. If you switch teams again, your 12th Memory will bring receipts.
+Returns saved memory records for the timeline.
 
-Your fan loyalty score is 33%. Your first recorded team was Argentina. Latest team memory: England.
+### Chat Agent
 
----
+```txt
+POST /api/chat
+```
 
-## Current MVP Status
+Used by the AI Fan Memory Agent.
 
-Completed:
+### Get Roasts
 
-- AI Chat Agent
-- Save Prediction
-- Memory Timeline
-- Loyalty Score
-- Prediction Survival Meter
-- Match Context Board
-- Upcoming Schedule
-- Walrus-style Memory Console
-- GitHub repository setup
+```txt
+GET /api/roasts
+```
 
-Planned:
-
-- Real Walrus Mainnet memory storage
-- Real Walrus blob/object proof display
-- Public deployment
-- Optional real football data API integration
-- Better AI model integration
-- Multi-user wallet-based memory identity
+Returns saved roast records.
 
 ---
 
-## Walrus Integration Plan
+## How It Works
 
-The current MVP stores memory in a local JSON file for fast prototyping.
+1. User enters a World Cup prediction.
+2. App sends the memory to the backend.
+3. Backend stores the memory through MemWal SDK.
+4. Walrus returns a Blob ID.
+5. App saves the readable memory and proof in the timeline index.
+6. User can ask the AI agent to remember, compare, roast, or check loyalty.
 
-Next, the memory object will be stored on Walrus Mainnet.
+---
 
-Example memory object:
+## Demo Flow
 
-{
-  "name": "Prince",
-  "team": "Argentina",
-  "predictionType": "Winner",
-  "prediction": "Argentina will win World Cup 2026",
-  "confidence": 80,
-  "mood": "Loyal",
-  "createdAt": "2026-06-23T10:00:00.000Z"
-}
+Suggested demo:
 
-After storing on Walrus, the app should display:
-
-Storage Mode: Walrus Mainnet  
-Memory Proof: Walrus blob ID  
-
-This will prove that the fan memory is persistent and verifiable.
+1. Save Portugal prediction with Emotional mood.
+2. Save England prediction with Roast Ready mood.
+3. Save Uruguay prediction with Overconfident mood.
+4. Click “Roast my last prediction.”
+5. Agent finds the Roast Ready memory and roasts England.
+6. Click “What is my loyalty score?”
+7. App calculates score based on real saved memory count.
+8. Click “Show my football memory.”
+9. App shows saved team history.
+10. Show Blob ID and Walrus proof link in the timeline.
 
 ---
 
 ## Hackathon Relevance
 
-The project directly supports the requirement for a World Cup 2026 memory-based agent.
+The project demonstrates:
 
-It demonstrates:
-
-- Persistent memory across sessions
-- A visible memory timeline
-- Agent behavior shaped by previous user data
-- Before/after changes in fan predictions
-- A meaningful public interface for memory
-- Walrus-style proof console for stored memory
-
----
-
-## Demo Video Flow
-
-Suggested 3-minute demo:
-1. Open The 12th Memory.
-2. Explain the tagline: Every fan is the 12th man. Now their football memory has proof.
-3. Save an Argentina winner prediction.
-4. Save a Brazil or England prediction.
-5. Ask: Which team am I backing?
-6. Ask: What is my loyalty score?
-7. Ask: Roast my last prediction.
-8. Ask: Is my prediction still alive?
-9. Show Match Context Board.
-10. Show Memory Timeline and Walrus Console.
+* Persistent AI memory
+* Fan prediction history
+* Agent behavior shaped by saved memory
+* Walrus Mainnet proof
+* Memory-based loyalty scoring
+* Roast Ready memory recall
+* Readable timeline with Blob ID proof
 
 ---
 
 ## Disclaimer
 
-This MVP uses demo World Cup match context and local JSON storage. Real Walrus Mainnet storage and live deployment are planned as the next step. The project does not use official FIFA branding, logos, or assets.
+This is a hackathon/demo project. It is not financial advice, betting advice, or an official FIFA product. The app uses football prediction data only to demonstrate persistent AI memory using Walrus Mainnet and MemWal SDK.
 
 ---
 
 ## Author
 
-Built by Imran for the World Cup 2026 Walrus Memory hackathon concept.
+Built by Imran.
+
+````
+
+Update panna:
+
+```bash
+nano README.md
+````
+
+Paste pannitu save:
+
+```txt
+Ctrl + O
+Enter
+Ctrl + X
+```
+
+GitHub push:
+
+```bash
+git add README.md
+git commit -m "Update final README"
+git push origin main
+```
+
