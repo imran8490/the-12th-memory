@@ -1,3 +1,12 @@
 node_modules/
 .env
+.env.local
+
 memory.json
+memory-index.json
+roast-index.json
+
+*_backup.js
+index_before_*.js
+index_scoreboard_backup_*.js
+index_*backup*.js

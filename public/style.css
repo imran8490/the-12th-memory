@@ -598,3 +598,25 @@ button:disabled {
     align-items: flex-start;
   }
 }
+
+/* Final scoreboard style for Match Context + Schedule */
+.match-board {
+  max-height: none;
+  overflow: visible;
+}
+
+.match-list {
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.match-item {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  line-height: 1.4;
+  font-size: 14px;
+  font-weight: 600;
+}
